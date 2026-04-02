@@ -371,7 +371,12 @@ public final class MarkdownDocumentRenderer {
             return nil
         }
 
-        let text = trimmed.dropFirst(hashes.count).trimmingCharacters(in: .whitespaces)
+        let remainder = trimmed.dropFirst(hashes.count)
+        guard remainder.first?.isWhitespace == true else {
+            return nil
+        }
+
+        let text = remainder.trimmingCharacters(in: .whitespaces)
 
         guard text.isEmpty == false else {
             return nil
