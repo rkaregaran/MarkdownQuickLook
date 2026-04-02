@@ -269,12 +269,11 @@ public final class MarkdownDocumentRenderer {
 
         case .quote(let paragraphs):
             for (index, paragraph) in paragraphs.enumerated() {
-                if index == 0 {
-                    appendInlineMarkdown("│ \(paragraph)", baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
-                } else {
+                if index > 0 {
                     output.append(NSAttributedString(string: "\n\n"))
-                    appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
                 }
+
+                appendInlineMarkdown("│ \(paragraph)", baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
             }
 
         case .list(let items):
@@ -286,7 +285,7 @@ public final class MarkdownDocumentRenderer {
                         appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
                     } else {
                         output.append(NSAttributedString(string: "\n\n"))
-                        appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                        appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: listContinuationParagraphAttributes(), to: output)
                     }
                 }
 
@@ -416,6 +415,20 @@ public final class MarkdownDocumentRenderer {
         return [
             .font: NSFont.systemFont(ofSize: 15),
             .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph
+        ]
+    }
+
+    private func listContinuationParagraphAttributes() -> [NSAttributedString.Key: Any] {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 4
+        paragraph.paragraphSpacing = 10
+        paragraph.firstLineHeadIndent = 24
+        paragraph.headIndent = 24
+
+        return [
+            .font: NSFont.systemFont(ofSize: 15),
+            .foregroundColor: NSColor.labelColor,
             .paragraphStyle: paragraph
         ]
     }

@@ -37,17 +37,17 @@ final class MarkdownDocumentRendererTests: XCTestCase {
     }
 
     func testRenderPreservesParagraphBreaksInsideMultiParagraphQuote() throws {
-        let payload = try renderDocument(
+        let rendered = renderedTextStorage(from: try renderDocument(
             """
             > first paragraph
             >
             > second paragraph
             """
-        ).payload
+        ).payload.attributedContent)
 
         XCTAssertEqual(
-            payload.attributedContent.string,
-            "│ first paragraph\n\nsecond paragraph"
+            rendered.string,
+            "│ first paragraph\n\n│ second paragraph"
         )
     }
 
@@ -67,19 +67,22 @@ final class MarkdownDocumentRendererTests: XCTestCase {
     }
 
     func testRenderPreservesFollowOnParagraphsInsideListItems() throws {
-        let payload = try renderDocument(
+        let rendered = renderedTextStorage(from: try renderDocument(
             """
             - first paragraph
 
               second paragraph in same item
             - next item
             """
-        ).payload
+        ).payload.attributedContent)
 
-        XCTAssertEqual(
-            payload.attributedContent.string,
-            "• first paragraph\n\nsecond paragraph in same item\n• next item"
-        )
+        let nsString = rendered.string as NSString
+        let secondParagraphRange = nsString.range(of: "second paragraph in same item")
+        let secondParagraphStyle = rendered.attribute(.paragraphStyle, at: secondParagraphRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        XCTAssertNotEqual(secondParagraphRange.location, NSNotFound)
+        XCTAssertGreaterThan(secondParagraphStyle?.headIndent ?? 0, 0)
+        XCTAssertGreaterThan(secondParagraphStyle?.firstLineHeadIndent ?? 0, 0)
     }
 
     func testRenderPreservesFencedCodeBlockContentAndStyle() throws {
