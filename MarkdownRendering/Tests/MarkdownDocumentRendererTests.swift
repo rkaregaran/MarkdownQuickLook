@@ -85,6 +85,50 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertGreaterThan(secondParagraphStyle?.firstLineHeadIndent ?? 0, 0)
     }
 
+    func testRenderAppliesHangingIndentToWrappedQuoteParagraphs() throws {
+        let rendered = renderedTextStorage(
+            from: try renderDocument(
+                """
+                > This is a long quote paragraph that should wrap in the text view so we can verify the second visual line stays aligned under the quote marker.
+                """
+            ).payload.attributedContent,
+            width: 190
+        )
+
+        let nsString = rendered.string as NSString
+        let paragraphRange = nsString.range(of: "This is a long quote paragraph")
+
+        XCTAssertNotEqual(paragraphRange.location, NSNotFound)
+        let paragraphStyle = rendered.attribute(.paragraphStyle, at: paragraphRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let wrappedLineCount = lineFragmentCount(in: rendered, for: paragraphRange)
+
+        XCTAssertGreaterThan(wrappedLineCount, 1)
+        XCTAssertEqual(paragraphStyle?.firstLineHeadIndent, 24)
+        XCTAssertEqual(paragraphStyle?.headIndent, 24)
+    }
+
+    func testRenderAppliesHangingIndentToWrappedFirstBulletParagraph() throws {
+        let rendered = renderedTextStorage(
+            from: try renderDocument(
+                """
+                - This is a long bullet item paragraph that should wrap in the text view so the continuation line keeps the same bullet text column.
+                """
+            ).payload.attributedContent,
+            width: 190
+        )
+
+        let nsString = rendered.string as NSString
+        let paragraphRange = nsString.range(of: "This is a long bullet item paragraph")
+
+        XCTAssertNotEqual(paragraphRange.location, NSNotFound)
+        let paragraphStyle = rendered.attribute(.paragraphStyle, at: paragraphRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let wrappedLineCount = lineFragmentCount(in: rendered, for: paragraphRange)
+
+        XCTAssertGreaterThan(wrappedLineCount, 1)
+        XCTAssertEqual(paragraphStyle?.firstLineHeadIndent, 24)
+        XCTAssertEqual(paragraphStyle?.headIndent, 24)
+    }
+
     func testRenderPreservesFencedCodeBlockContentAndStyle() throws {
         let payload = try renderDocument(
             """
@@ -196,21 +240,36 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         return (url, payload)
     }
 
-    private func renderedTextStorage(from attributedContent: NSAttributedString) -> NSTextStorage {
-        let textView = NSTextView(frame: .zero)
+    private func renderedTextStorage(from attributedContent: NSAttributedString, width: CGFloat = 320) -> NSTextStorage {
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: 1000))
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.textContainerInset = .zero
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         textView.textStorage?.setAttributedString(attributedContent)
         if let textContainer = textView.textContainer {
             textView.layoutManager?.ensureLayout(for: textContainer)
         }
 
         return textView.textStorage ?? NSTextStorage(attributedString: attributedContent)
+    }
+
+    private func lineFragmentCount(in textStorage: NSTextStorage, for characterRange: NSRange) -> Int {
+        guard let layoutManager = textStorage.layoutManagers.first else {
+            return 0
+        }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+        var count = 0
+
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, _, _ in
+            count += 1
+        }
+
+        return count
     }
 }

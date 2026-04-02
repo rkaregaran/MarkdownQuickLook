@@ -26,6 +26,12 @@ public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError {
 }
 
 public final class MarkdownDocumentRenderer {
+    private enum LayoutConstants {
+        static let lineSpacing: CGFloat = 4
+        static let paragraphSpacing: CGFloat = 10
+        static let hangingIndent: CGFloat = 24
+    }
+
     public init() {}
 
     public func render(fileAt url: URL) throws -> MarkdownRenderPayload {
@@ -280,9 +286,9 @@ public final class MarkdownDocumentRenderer {
             for (itemIndex, item) in items.enumerated() {
                 for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
                     if itemIndex == 0 && paragraphIndex == 0 {
-                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
                     } else if paragraphIndex == 0 {
-                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
                     } else {
                         output.append(NSAttributedString(string: "\n\n"))
                         appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: listContinuationParagraphAttributes(), to: output)
@@ -323,9 +329,7 @@ public final class MarkdownDocumentRenderer {
     private func applyHeadingStyle(level: Int, to attributed: NSMutableAttributedString) {
         let fullRange = NSRange(location: 0, length: attributed.length)
         let headingColor = NSColor.labelColor
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.paragraphSpacing = 10
+        let paragraph = bodyParagraphStyle()
 
         attributed.addAttribute(.foregroundColor, value: headingColor, range: fullRange)
         attributed.addAttribute(.paragraphStyle, value: paragraph, range: fullRange)
@@ -381,55 +385,51 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func appendCodeBlock(_ code: String, to output: NSMutableAttributedString) {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.paragraphSpacing = 10
-
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
             .foregroundColor: NSColor.labelColor,
             .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: paragraph
+            .paragraphStyle: bodyParagraphStyle()
         ]
 
         output.append(NSAttributedString(string: code, attributes: attributes))
     }
 
     private func paragraphAttributes() -> [NSAttributedString.Key: Any] {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.paragraphSpacing = 10
-
         return [
             .font: NSFont.systemFont(ofSize: 15),
             .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraph
+            .paragraphStyle: bodyParagraphStyle()
         ]
     }
 
     private func quoteAttributes() -> [NSAttributedString.Key: Any] {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.paragraphSpacing = 10
-
-        return [
-            .font: NSFont.systemFont(ofSize: 15),
-            .foregroundColor: NSColor.secondaryLabelColor,
-            .paragraphStyle: paragraph
-        ]
+        return hangingIndentAttributes(foregroundColor: NSColor.secondaryLabelColor)
     }
 
     private func listContinuationParagraphAttributes() -> [NSAttributedString.Key: Any] {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.paragraphSpacing = 10
-        paragraph.firstLineHeadIndent = 24
-        paragraph.headIndent = 24
+        return hangingIndentAttributes(foregroundColor: NSColor.labelColor)
+    }
 
-        return [
+    private func bodyParagraphStyle() -> NSMutableParagraphStyle {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = LayoutConstants.lineSpacing
+        paragraph.paragraphSpacing = LayoutConstants.paragraphSpacing
+        return paragraph
+    }
+
+    private func hangingIndentParagraphStyle() -> NSMutableParagraphStyle {
+        let paragraph = bodyParagraphStyle()
+        paragraph.firstLineHeadIndent = LayoutConstants.hangingIndent
+        paragraph.headIndent = LayoutConstants.hangingIndent
+        return paragraph
+    }
+
+    private func hangingIndentAttributes(foregroundColor: NSColor) -> [NSAttributedString.Key: Any] {
+        [
             .font: NSFont.systemFont(ofSize: 15),
-            .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: paragraph
+            .foregroundColor: foregroundColor,
+            .paragraphStyle: hangingIndentParagraphStyle()
         ]
     }
 
