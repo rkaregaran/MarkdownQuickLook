@@ -36,6 +36,21 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         )
     }
 
+    func testRenderPreservesParagraphBreaksInsideMultiParagraphQuote() throws {
+        let payload = try renderDocument(
+            """
+            > first paragraph
+            >
+            > second paragraph
+            """
+        ).payload
+
+        XCTAssertEqual(
+            payload.attributedContent.string,
+            "│ first paragraph\n\nsecond paragraph"
+        )
+    }
+
     func testRenderKeepsMultiLineListItemTogether() throws {
         let payload = try renderDocument(
             """
@@ -48,6 +63,22 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(
             payload.attributedContent.string,
             "• First list line continuation line\n• Second item"
+        )
+    }
+
+    func testRenderPreservesFollowOnParagraphsInsideListItems() throws {
+        let payload = try renderDocument(
+            """
+            - first paragraph
+
+              second paragraph in same item
+            - next item
+            """
+        ).payload
+
+        XCTAssertEqual(
+            payload.attributedContent.string,
+            "• first paragraph\n\nsecond paragraph in same item\n• next item"
         )
     }
 

@@ -62,9 +62,13 @@ public final class MarkdownDocumentRenderer {
     private enum MarkdownBlock {
         case heading(level: Int, text: String)
         case paragraph(String)
-        case quote(String)
-        case list([String])
+        case quote([String])
+        case list([MarkdownListItem])
         case code(String)
+    }
+
+    private struct MarkdownListItem {
+        let paragraphs: [String]
     }
 
     private func parseBlocks(in source: String) -> [MarkdownBlock] {
@@ -91,7 +95,7 @@ public final class MarkdownDocumentRenderer {
             }
 
             if let quote = parseQuoteBlock(from: lines, startingAt: index) {
-                blocks.append(.quote(quote.text))
+                blocks.append(.quote(quote.paragraphs))
                 index = quote.nextIndex
                 continue
             }
@@ -130,48 +134,74 @@ public final class MarkdownDocumentRenderer {
         return (codeLines.joined(separator: "\n"), cursor)
     }
 
-    private func parseQuoteBlock(from lines: [String], startingAt index: Int) -> (text: String, nextIndex: Int)? {
+    private func parseQuoteBlock(from lines: [String], startingAt index: Int) -> (paragraphs: [String], nextIndex: Int)? {
         guard isQuoteLine(lines[index]) else {
             return nil
         }
 
-        var quoteLines: [String] = []
+        var paragraphs: [String] = []
+        var currentParagraphLines: [String] = []
         var cursor = index
 
         while cursor < lines.count, isQuoteLine(lines[cursor]) {
-            quoteLines.append(quoteContent(from: lines[cursor]))
+            let content = quoteContent(from: lines[cursor])
+
+            if content.isEmpty {
+                if currentParagraphLines.isEmpty == false {
+                    paragraphs.append(currentParagraphLines.joined(separator: " "))
+                    currentParagraphLines.removeAll()
+                }
+            } else {
+                currentParagraphLines.append(content)
+            }
+
             cursor += 1
         }
 
-        return (quoteLines.joined(separator: " "), cursor)
+        if currentParagraphLines.isEmpty == false {
+            paragraphs.append(currentParagraphLines.joined(separator: " "))
+        }
+
+        return (paragraphs, cursor)
     }
 
-    private func parseListBlock(from lines: [String], startingAt index: Int) -> (items: [String], nextIndex: Int)? {
+    private func parseListBlock(from lines: [String], startingAt index: Int) -> (items: [MarkdownListItem], nextIndex: Int)? {
         guard isBulletLine(lines[index]) else {
             return nil
         }
 
-        var items: [String] = []
+        var items: [MarkdownListItem] = []
         var cursor = index
 
         while cursor < lines.count, isBulletLine(lines[cursor]) {
             let item = parseListItem(from: lines, startingAt: cursor)
-            items.append(item.text)
+            items.append(item.item)
             cursor = item.nextIndex
         }
 
         return (items, cursor)
     }
 
-    private func parseListItem(from lines: [String], startingAt index: Int) -> (text: String, nextIndex: Int) {
+    private func parseListItem(from lines: [String], startingAt index: Int) -> (item: MarkdownListItem, nextIndex: Int) {
         let firstLine = bulletContent(from: lines[index]) ?? ""
-        var parts = [firstLine]
+        var paragraphs: [String] = []
+        var currentParagraph = firstLine
         var cursor = index + 1
 
         while cursor < lines.count {
             let line = lines[cursor]
 
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let nextNonBlankIndex = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1),
+                   isContinuationParagraphLine(lines[nextNonBlankIndex]) {
+                    if currentParagraph.isEmpty == false {
+                        paragraphs.append(currentParagraph)
+                    }
+                    currentParagraph = ""
+                    cursor = nextNonBlankIndex
+                    continue
+                }
+
                 break
             }
 
@@ -179,15 +209,26 @@ public final class MarkdownDocumentRenderer {
                 break
             }
 
-            guard line.hasPrefix(" ") || line.hasPrefix("\t") else {
+            guard isContinuationParagraphLine(line) else {
                 break
             }
 
-            parts.append(line.trimmingCharacters(in: .whitespaces))
+            let content = line.trimmingCharacters(in: .whitespaces)
+
+            if currentParagraph.isEmpty {
+                currentParagraph = content
+            } else {
+                currentParagraph += " " + content
+            }
+
             cursor += 1
         }
 
-        return (parts.joined(separator: " "), cursor)
+        if currentParagraph.isEmpty == false {
+            paragraphs.append(currentParagraph)
+        }
+
+        return (MarkdownListItem(paragraphs: paragraphs), cursor)
     }
 
     private func parseParagraph(from lines: [String], startingAt index: Int) -> (text: String, nextIndex: Int) {
@@ -226,14 +267,30 @@ public final class MarkdownDocumentRenderer {
         case .paragraph(let text):
             appendInlineMarkdown(text, baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
 
-        case .quote(let text):
-            appendInlineMarkdown("│ \(text)", baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
+        case .quote(let paragraphs):
+            for (index, paragraph) in paragraphs.enumerated() {
+                if index == 0 {
+                    appendInlineMarkdown("│ \(paragraph)", baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
+                } else {
+                    output.append(NSAttributedString(string: "\n\n"))
+                    appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
+                }
+            }
 
         case .list(let items):
-            for (index, item) in items.enumerated() {
-                appendInlineMarkdown("• \(item)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+            for (itemIndex, item) in items.enumerated() {
+                for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
+                    if itemIndex == 0 && paragraphIndex == 0 {
+                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                    } else if paragraphIndex == 0 {
+                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                    } else {
+                        output.append(NSAttributedString(string: "\n\n"))
+                        appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+                    }
+                }
 
-                if index < items.count - 1 {
+                if itemIndex < items.count - 1 {
                     output.append(NSAttributedString(string: "\n"))
                 }
             }
@@ -403,6 +460,10 @@ public final class MarkdownDocumentRenderer {
         bulletContent(from: line) != nil
     }
 
+    private func isContinuationParagraphLine(_ line: String) -> Bool {
+        line.hasPrefix(" ") || line.hasPrefix("\t")
+    }
+
     private func bulletContent(from line: String) -> String? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
 
@@ -441,6 +502,20 @@ public final class MarkdownDocumentRenderer {
         }
 
         return false
+    }
+
+    private func nextNonBlankLineIndex(in lines: [String], startingAt index: Int) -> Int? {
+        var cursor = index
+
+        while cursor < lines.count {
+            if lines[cursor].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                return cursor
+            }
+
+            cursor += 1
+        }
+
+        return nil
     }
 
 }
