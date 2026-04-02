@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct StatusView: View {
+    @ObservedObject var appState: AppState
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Markdown Quick Look")
@@ -13,6 +15,22 @@ struct StatusView: View {
 
             Text("Project source of truth: project.yml")
                 .font(.system(.body, design: .monospaced))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Opened files")
+                    .font(.headline)
+
+                if appState.openedFileURLs.isEmpty {
+                    Text("No files have been opened yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(appState.openedFileURLs, id: \.self) { url in
+                        Text(url.path)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                }
+            }
         }
         .padding(24)
         .frame(width: 560)

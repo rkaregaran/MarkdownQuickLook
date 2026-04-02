@@ -12,8 +12,8 @@ struct PreviewRootView: View {
                 .font(.title2.weight(.semibold))
 
             if let attributedContent {
-                Text(attributedContent.string)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                MarkdownTextView(attributedString: attributedContent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text(message ?? "No preview available.")
                     .foregroundStyle(.secondary)
