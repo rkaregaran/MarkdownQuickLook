@@ -61,7 +61,7 @@ public final class MarkdownDocumentRenderer {
 
         return MarkdownRenderPayload(
             title: url.lastPathComponent,
-            attributedContent: formatted
+            attributedContent: NSAttributedString(attributedString: formatted)
         )
     }
 

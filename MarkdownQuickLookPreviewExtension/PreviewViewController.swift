@@ -4,7 +4,6 @@ import Quartz
 import SwiftUI
 
 final class PreviewViewController: NSViewController, QLPreviewingController {
-    private let renderer = MarkdownDocumentRenderer()
     private let hostingView = NSHostingView(
         rootView: PreviewRootView(title: "Markdown Preview", message: "Loading preview...", attributedContent: nil)
     )
@@ -28,25 +27,37 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     func preparePreviewOfFile(at url: URL) async throws {
+        let result: Result<MarkdownRenderPayload, Error>
+
         do {
-            let payload = try renderer.render(fileAt: url)
-            hostingView.rootView = PreviewRootView(
-                title: payload.title,
-                message: nil,
-                attributedContent: payload.attributedContent
-            )
-        } catch let error as MarkdownDocumentRendererError {
-            hostingView.rootView = PreviewRootView(
-                title: url.lastPathComponent,
-                message: error.errorDescription,
-                attributedContent: nil
-            )
+            result = .success(try await Task.detached(priority: .userInitiated) {
+                try MarkdownDocumentRenderer().render(fileAt: url)
+            }.value)
         } catch {
-            hostingView.rootView = PreviewRootView(
-                title: url.lastPathComponent,
-                message: error.localizedDescription,
-                attributedContent: nil
-            )
+            result = .failure(error)
+        }
+
+        await MainActor.run {
+            switch result {
+            case .success(let payload):
+                hostingView.rootView = PreviewRootView(
+                    title: payload.title,
+                    message: nil,
+                    attributedContent: payload.attributedContent
+                )
+            case .failure(let error as MarkdownDocumentRendererError):
+                hostingView.rootView = PreviewRootView(
+                    title: url.lastPathComponent,
+                    message: error.errorDescription,
+                    attributedContent: nil
+                )
+            case .failure(let error):
+                hostingView.rootView = PreviewRootView(
+                    title: url.lastPathComponent,
+                    message: error.localizedDescription,
+                    attributedContent: nil
+                )
+            }
         }
     }
 }
