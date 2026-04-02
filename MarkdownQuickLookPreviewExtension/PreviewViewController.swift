@@ -9,8 +9,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     private let hostingView = NSHostingView(
         rootView: PreviewRootView(title: "Markdown Preview", message: "Loading preview...", attributedContent: nil)
     )
-    private var requestTracker = PreviewRequestTracker()
-    private var activeRenderTask: Task<PreviewLoadResult, Never>?
+    private let loadingCoordinator = PreviewLoadingCoordinator<PreviewLoadResult>()
 
     override func loadView() {
         view = NSView()
@@ -31,32 +30,25 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     func preparePreviewOfFile(at url: URL) async throws {
-        let requestID = requestTracker.beginRequest()
-        activeRenderTask?.cancel()
-        hostingView.rootView = loadingRootView(for: url)
-
-        let renderTask = Task.detached(priority: .userInitiated) {
+        let request = loadingCoordinator.beginRequest {
             Self.prepareDocumentResult(for: url)
         }
-        activeRenderTask = renderTask
+        hostingView.rootView = loadingRootView(for: url)
 
         let result = await withTaskCancellationHandler {
-            await renderTask.value
+            await request.task.value
         } onCancel: {
-            renderTask.cancel()
+            request.task.cancel()
         }
 
         guard Task.isCancelled == false else {
-            cancelRequestIfActive(requestID)
+            _ = loadingCoordinator.cancelRequest(request.requestID, task: request.task)
             return
         }
 
-        guard requestTracker.isActive(requestID) else {
+        guard loadingCoordinator.finishRequest(request.requestID) else {
             return
         }
-
-        _ = requestTracker.finishRequest(requestID)
-        activeRenderTask = nil
 
         switch result {
         case .prepared(let document):
@@ -89,14 +81,6 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             message: "Loading preview...",
             attributedContent: nil
         )
-    }
-
-    private func cancelRequestIfActive(_ requestID: UUID) {
-        guard requestTracker.cancelRequest(requestID) else {
-            return
-        }
-
-        activeRenderTask = nil
     }
 
     private nonisolated static func prepareDocumentResult(for url: URL) -> PreviewLoadResult {

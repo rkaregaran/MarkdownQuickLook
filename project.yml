@@ -73,6 +73,7 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: MarkdownQuickLookPreviewExtension/Tests
+      - path: MarkdownQuickLookPreviewExtension/PreviewLoadingCoordinator.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewRequestTracker.swift
     settings:
       base:
