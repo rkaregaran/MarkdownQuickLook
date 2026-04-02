@@ -4,17 +4,28 @@ struct StatusView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("Markdown Quick Look")
                 .font(.largeTitle.weight(.semibold))
 
             Text("This app installs a Quick Look Preview Extension that best-effort targets standard .md files.")
 
-            Text("Finder may still keep the built-in plain-text preview on some macOS releases.")
+            Text("Target content type: net.daringfireball.markdown")
+                .font(.system(.body, design: .monospaced))
+
+            Text("Expected caveat: Finder may still keep the built-in plain-text preview on some macOS releases.")
                 .foregroundStyle(.secondary)
 
-            Text("Project source of truth: project.yml")
-                .font(.system(.body, design: .monospaced))
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Local verification")
+                    .font(.headline)
+
+                Text("1. Run Scripts/dev-preview.sh")
+                Text("2. Open the fixture in Finder")
+                Text("3. Press Space to compare Finder's chosen preview")
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Opened files")
@@ -33,6 +44,6 @@ struct StatusView: View {
             }
         }
         .padding(24)
-        .frame(width: 560)
+        .frame(width: 620)
     }
 }

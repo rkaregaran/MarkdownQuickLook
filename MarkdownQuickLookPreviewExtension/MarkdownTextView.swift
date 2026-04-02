@@ -2,24 +2,27 @@ import AppKit
 import SwiftUI
 
 struct MarkdownTextView: NSViewRepresentable {
-    let attributedString: NSAttributedString
+    let attributedText: NSAttributedString
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 0, height: 8)
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
-        textView.textContainerInset = NSSize(width: 0, height: 0)
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textStorage?.setAttributedString(attributedString)
+        textView.textStorage?.setAttributedString(attributedText)
 
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
         scrollView.documentView = textView
         return scrollView
     }
@@ -29,6 +32,6 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
-        textView.textStorage?.setAttributedString(attributedString)
+        textView.textStorage?.setAttributedString(attributedText)
     }
 }
