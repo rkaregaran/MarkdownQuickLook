@@ -281,6 +281,50 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         }
     }
 
+    func testPreparedDocumentRendersSameContentAsDirectRender() throws {
+        let url = try temporaryMarkdownFile(
+            """
+            # Title
+
+            Paragraph with [OpenAI](https://openai.com).
+
+            - Bullet item
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let renderer = MarkdownDocumentRenderer()
+
+        let directPayload = try renderer.render(fileAt: url)
+        let preparedDocument = try renderer.prepareDocument(fileAt: url)
+        let preparedPayload = renderer.render(document: preparedDocument)
+
+        XCTAssertEqual(preparedDocument.title, url.lastPathComponent)
+        XCTAssertEqual(preparedPayload.title, directPayload.title)
+        XCTAssertEqual(preparedPayload.attributedContent.string, directPayload.attributedContent.string)
+    }
+
+    func testPreparedDocumentSupportsOffMainPreparation() async throws {
+        let url = try temporaryMarkdownFile(
+            """
+            # Title
+
+            Paragraph with `code`.
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let preparedDocument = try await Task.detached(priority: .userInitiated) {
+            try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
+        }.value
+
+        let payload = MarkdownDocumentRenderer().render(document: preparedDocument)
+
+        XCTAssertEqual(preparedDocument.title, url.lastPathComponent)
+        XCTAssertTrue(payload.attributedContent.string.contains("Title"))
+        XCTAssertTrue(payload.attributedContent.string.contains("Paragraph with code."))
+    }
+
     private func temporaryMarkdownFile(_ contents: String) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

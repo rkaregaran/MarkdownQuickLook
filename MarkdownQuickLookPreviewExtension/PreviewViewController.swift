@@ -3,10 +3,14 @@ import MarkdownRendering
 import Quartz
 import SwiftUI
 
+@MainActor
 final class PreviewViewController: NSViewController, QLPreviewingController {
+    private let renderer = MarkdownDocumentRenderer()
     private let hostingView = NSHostingView(
         rootView: PreviewRootView(title: "Markdown Preview", message: "Loading preview...", attributedContent: nil)
     )
+    private var requestTracker = PreviewRequestTracker()
+    private var activeRenderTask: Task<PreviewLoadResult, Never>?
 
     override func loadView() {
         view = NSView()
@@ -27,37 +31,76 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     func preparePreviewOfFile(at url: URL) async throws {
-        let result: Result<MarkdownRenderPayload, Error>
+        let requestID = requestTracker.beginRequest()
+        activeRenderTask?.cancel()
+        hostingView.rootView = loadingRootView(for: url)
 
-        do {
-            result = .success(try await Task.detached(priority: .userInitiated) {
-                try MarkdownDocumentRenderer().render(fileAt: url)
-            }.value)
-        } catch {
-            result = .failure(error)
+        let renderTask = Task.detached(priority: .userInitiated) {
+            Self.prepareDocumentResult(for: url)
+        }
+        activeRenderTask = renderTask
+
+        let result = await renderTask.value
+
+        guard requestTracker.isActive(requestID) else {
+            return
         }
 
-        await MainActor.run {
-            switch result {
-            case .success(let payload):
-                hostingView.rootView = PreviewRootView(
-                    title: payload.title,
-                    message: nil,
-                    attributedContent: payload.attributedContent
-                )
-            case .failure(let error as MarkdownDocumentRendererError):
-                hostingView.rootView = PreviewRootView(
-                    title: url.lastPathComponent,
-                    message: error.errorDescription,
-                    attributedContent: nil
-                )
-            case .failure(let error):
-                hostingView.rootView = PreviewRootView(
-                    title: url.lastPathComponent,
-                    message: error.localizedDescription,
-                    attributedContent: nil
-                )
-            }
+        _ = requestTracker.finishRequest(requestID)
+        activeRenderTask = nil
+
+        switch result {
+        case .prepared(let document):
+            let payload = renderer.render(document: document)
+            hostingView.rootView = PreviewRootView(
+                title: payload.title,
+                message: nil,
+                attributedContent: payload.attributedContent
+            )
+        case .rendererError(let error):
+            hostingView.rootView = PreviewRootView(
+                title: url.lastPathComponent,
+                message: error.errorDescription,
+                attributedContent: nil
+            )
+        case .failure(let message):
+            hostingView.rootView = PreviewRootView(
+                title: url.lastPathComponent,
+                message: message,
+                attributedContent: nil
+            )
+        case .cancelled:
+            break
         }
     }
+
+    private func loadingRootView(for url: URL) -> PreviewRootView {
+        PreviewRootView(
+            title: url.lastPathComponent,
+            message: "Loading preview...",
+            attributedContent: nil
+        )
+    }
+
+    private nonisolated static func prepareDocumentResult(for url: URL) -> PreviewLoadResult {
+        guard Task.isCancelled == false else {
+            return .cancelled
+        }
+
+        do {
+            let document = try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
+            return Task.isCancelled ? .cancelled : .prepared(document)
+        } catch let error as MarkdownDocumentRendererError {
+            return Task.isCancelled ? .cancelled : .rendererError(error)
+        } catch {
+            return Task.isCancelled ? .cancelled : .failure(error.localizedDescription)
+        }
+    }
+}
+
+private enum PreviewLoadResult: Sendable {
+    case prepared(MarkdownPreparedDocument)
+    case rendererError(MarkdownDocumentRendererError)
+    case failure(String)
+    case cancelled
 }

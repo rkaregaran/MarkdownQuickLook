@@ -11,7 +11,7 @@ public struct MarkdownRenderPayload {
     }
 }
 
-public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError {
+public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError, Sendable {
     case unreadableFile(URL)
     case emptyDocument(URL)
 
@@ -25,6 +25,24 @@ public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError {
     }
 }
 
+enum MarkdownBlock: Sendable {
+    case heading(level: Int, text: String)
+    case paragraph(String)
+    case quote([String])
+    case list([MarkdownListItem])
+    case code(String)
+}
+
+struct MarkdownListItem: Sendable {
+    let paragraphs: [String]
+}
+
+public struct MarkdownPreparedDocument: Sendable {
+    public let title: String
+    let baseURL: URL
+    let blocks: [MarkdownBlock]
+}
+
 public final class MarkdownDocumentRenderer {
     private enum LayoutConstants {
         static let lineSpacing: CGFloat = 4
@@ -34,7 +52,7 @@ public final class MarkdownDocumentRenderer {
 
     public init() {}
 
-    public func render(fileAt url: URL) throws -> MarkdownRenderPayload {
+    public func prepareDocument(fileAt url: URL) throws -> MarkdownPreparedDocument {
         let source: String
 
         do {
@@ -47,34 +65,32 @@ public final class MarkdownDocumentRenderer {
             throw MarkdownDocumentRendererError.emptyDocument(url)
         }
 
-        let blocks = parseBlocks(in: source)
+        return MarkdownPreparedDocument(
+            title: url.lastPathComponent,
+            baseURL: url.deletingLastPathComponent(),
+            blocks: parseBlocks(in: source)
+        )
+    }
+
+    public func render(document: MarkdownPreparedDocument) -> MarkdownRenderPayload {
         let formatted = NSMutableAttributedString()
-        let baseURL = url.deletingLastPathComponent()
 
-        for (index, block) in blocks.enumerated() {
-            append(block, to: formatted, baseURL: baseURL)
+        for (index, block) in document.blocks.enumerated() {
+            append(block, to: formatted, baseURL: document.baseURL)
 
-            if index < blocks.count - 1 {
+            if index < document.blocks.count - 1 {
                 formatted.append(NSAttributedString(string: "\n\n"))
             }
         }
 
         return MarkdownRenderPayload(
-            title: url.lastPathComponent,
+            title: document.title,
             attributedContent: NSAttributedString(attributedString: formatted)
         )
     }
 
-    private enum MarkdownBlock {
-        case heading(level: Int, text: String)
-        case paragraph(String)
-        case quote([String])
-        case list([MarkdownListItem])
-        case code(String)
-    }
-
-    private struct MarkdownListItem {
-        let paragraphs: [String]
+    public func render(fileAt url: URL) throws -> MarkdownRenderPayload {
+        try render(document: prepareDocument(fileAt: url))
     }
 
     private func parseBlocks(in source: String) -> [MarkdownBlock] {

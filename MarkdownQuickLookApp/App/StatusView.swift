@@ -22,7 +22,7 @@ struct StatusView: View {
                 Text("Local verification")
                     .font(.headline)
 
-                Text("1. Run Scripts/dev-preview.sh")
+                Text("1. Run ./Scripts/dev-preview.sh")
                 Text("2. Open the fixture in Finder")
                 Text("3. Press Space to compare Finder's chosen preview")
             }

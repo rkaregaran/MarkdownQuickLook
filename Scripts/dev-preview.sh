@@ -24,7 +24,12 @@ qlmanage -r cache
 
 echo
 echo "Extension registration:"
-pluginkit -m -A | rg 'MarkdownQuickLook' || true
+REGISTRATION_OUTPUT="$(pluginkit -m -A | rg 'MarkdownQuickLook' || true)"
+if [[ -n "$REGISTRATION_OUTPUT" ]]; then
+  echo "$REGISTRATION_OUTPUT"
+else
+  echo "  Warning: no MarkdownQuickLook registration entries were found."
+fi
 
 echo
 echo "App bundle:"

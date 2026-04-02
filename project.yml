@@ -29,6 +29,7 @@ targets:
       - path: MarkdownQuickLookPreviewExtension
         excludes:
           - Info.plist
+          - Tests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app.preview
@@ -65,3 +66,17 @@ targets:
         BUNDLE_LOADER: ""
     dependencies:
       - target: MarkdownRendering
+
+  MarkdownQuickLookPreviewExtensionTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownQuickLookPreviewExtension/Tests
+      - path: MarkdownQuickLookPreviewExtension/PreviewRequestTracker.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.previewExtensionTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
