@@ -129,6 +129,62 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(paragraphStyle?.headIndent, 24)
     }
 
+    func testRenderTreatsCRLFInputLikeLFInputForSupportedBlocks() throws {
+        let lfMarkdown = """
+        Paragraph one
+
+        > Quote line one
+        > quote line two
+
+        - Bullet line one
+          bullet continuation
+
+        ```
+        let value = 1
+        let doubled = value * 2
+        ```
+        """
+        let crlfMarkdown = lfMarkdown.replacingOccurrences(of: "\n", with: "\r\n")
+
+        let lfPayload = try renderDocument(lfMarkdown).payload
+        let crlfPayload = try renderDocument(crlfMarkdown).payload
+
+        XCTAssertEqual(
+            crlfPayload.attributedContent.string,
+            lfPayload.attributedContent.string
+        )
+        XCTAssertEqual(
+            crlfPayload.attributedContent.string,
+            "Paragraph one\n\n│ Quote line one quote line two\n\n• Bullet line one bullet continuation\n\nlet value = 1\nlet doubled = value * 2"
+        )
+    }
+
+    func testRenderUsesTightParagraphSpacingForCodeBlocksInTextView() throws {
+        let rendered = renderedTextStorage(
+            from: try renderDocument(
+                """
+                ```
+                let value = 1
+                let doubled = value * 2
+                ```
+                """
+            ).payload.attributedContent,
+            width: 260
+        )
+
+        let nsString = rendered.string as NSString
+        let codeRange = nsString.range(of: "let value = 1\nlet doubled = value * 2")
+
+        XCTAssertNotEqual(codeRange.location, NSNotFound)
+        let paragraphStyle = rendered.attribute(.paragraphStyle, at: codeRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let lineFragments = lineFragmentCount(in: rendered, for: codeRange)
+
+        XCTAssertEqual(lineFragments, 2)
+        XCTAssertEqual(paragraphStyle?.lineSpacing, 0)
+        XCTAssertEqual(paragraphStyle?.paragraphSpacing, 0)
+        XCTAssertEqual(paragraphStyle?.paragraphSpacingBefore, 0)
+    }
+
     func testRenderPreservesFencedCodeBlockContentAndStyle() throws {
         let payload = try renderDocument(
             """

@@ -78,7 +78,8 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func parseBlocks(in source: String) -> [MarkdownBlock] {
-        let lines = source.components(separatedBy: .newlines)
+        let normalizedSource = normalizeLineEndings(in: source)
+        let lines = normalizedSource.components(separatedBy: .newlines)
         var blocks: [MarkdownBlock] = []
         var index = 0
 
@@ -389,7 +390,7 @@ public final class MarkdownDocumentRenderer {
             .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
             .foregroundColor: NSColor.labelColor,
             .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: bodyParagraphStyle()
+            .paragraphStyle: codeParagraphStyle()
         ]
 
         output.append(NSAttributedString(string: code, attributes: attributes))
@@ -431,6 +432,20 @@ public final class MarkdownDocumentRenderer {
             .foregroundColor: foregroundColor,
             .paragraphStyle: hangingIndentParagraphStyle()
         ]
+    }
+
+    private func codeParagraphStyle() -> NSMutableParagraphStyle {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 0
+        paragraph.paragraphSpacing = 0
+        paragraph.paragraphSpacingBefore = 0
+        return paragraph
+    }
+
+    private func normalizeLineEndings(in source: String) -> String {
+        source
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
     }
 
     private func heading(from line: String) -> (level: Int, text: String)? {
