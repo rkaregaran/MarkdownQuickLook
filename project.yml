@@ -1,0 +1,67 @@
+name: MarkdownQuickLook
+options:
+  minimumXcodeGenVersion: 2.45.3
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+targets:
+  MarkdownQuickLookApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownQuickLookApp/App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app
+        INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: MarkdownQuickLookPreviewExtension
+        embed: true
+
+  MarkdownQuickLookPreviewExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownQuickLookPreviewExtension
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app.preview
+        INFOPLIST_FILE: MarkdownQuickLookPreviewExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_USER_SELECTED_FILES: readonly
+    dependencies:
+      - target: MarkdownRendering
+
+  MarkdownRendering:
+    type: framework
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownRendering/Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.rendering
+        GENERATE_INFOPLIST_FILE: YES
+
+  MarkdownRenderingTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownRendering/Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.renderingTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+    dependencies:
+      - target: MarkdownRendering

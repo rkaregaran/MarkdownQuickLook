@@ -1,0 +1,8 @@
+.DS_Store
+.derivedData/
+.build/
+.superpowers/
+MarkdownQuickLook.xcodeproj/
+*.xcworkspace/
+*.xcuserstate
+*.xcuserdata/
