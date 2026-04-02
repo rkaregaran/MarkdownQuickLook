@@ -26,6 +26,7 @@ final class PreviewLoadingCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(coordinator.cancelRequest(request.requestID, task: request.task))
         XCTAssertTrue(request.task.isCancelled)
+        XCTAssertNil(coordinator.activeTask)
         XCTAssertFalse(coordinator.finishRequest(request.requestID))
     }
 }
