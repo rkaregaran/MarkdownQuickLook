@@ -22,4 +22,9 @@ struct PreviewRequestTracker {
         activeRequestID = nil
         return true
     }
+
+    @discardableResult
+    mutating func cancelRequest(_ requestID: UUID) -> Bool {
+        finishRequest(requestID)
+    }
 }

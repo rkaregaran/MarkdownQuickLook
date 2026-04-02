@@ -72,6 +72,7 @@ public final class MarkdownDocumentRenderer {
         )
     }
 
+    @MainActor
     public func render(document: MarkdownPreparedDocument) -> MarkdownRenderPayload {
         let formatted = NSMutableAttributedString()
 
@@ -89,6 +90,7 @@ public final class MarkdownDocumentRenderer {
         )
     }
 
+    @MainActor
     public func render(fileAt url: URL) throws -> MarkdownRenderPayload {
         try render(document: prepareDocument(fileAt: url))
     }

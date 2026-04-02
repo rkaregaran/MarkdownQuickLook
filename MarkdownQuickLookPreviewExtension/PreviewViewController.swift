@@ -40,7 +40,16 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         }
         activeRenderTask = renderTask
 
-        let result = await renderTask.value
+        let result = await withTaskCancellationHandler {
+            await renderTask.value
+        } onCancel: {
+            renderTask.cancel()
+        }
+
+        guard Task.isCancelled == false else {
+            cancelRequestIfActive(requestID)
+            return
+        }
 
         guard requestTracker.isActive(requestID) else {
             return
@@ -80,6 +89,14 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             message: "Loading preview...",
             attributedContent: nil
         )
+    }
+
+    private func cancelRequestIfActive(_ requestID: UUID) {
+        guard requestTracker.cancelRequest(requestID) else {
+            return
+        }
+
+        activeRenderTask = nil
     }
 
     private nonisolated static func prepareDocumentResult(for url: URL) -> PreviewLoadResult {

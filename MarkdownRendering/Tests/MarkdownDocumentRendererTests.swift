@@ -2,6 +2,7 @@ import AppKit
 import XCTest
 @testable import MarkdownRendering
 
+@MainActor
 final class MarkdownDocumentRendererTests: XCTestCase {
     func testRenderKeepsWrappedParagraphLinesTogether() throws {
         let document = try renderDocument(
@@ -281,7 +282,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         }
     }
 
-    func testPreparedDocumentRendersSameContentAsDirectRender() throws {
+    func testPreparedDocumentRendersSameContentAsDirectRender() async throws {
         let url = try temporaryMarkdownFile(
             """
             # Title
@@ -295,9 +296,13 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         let renderer = MarkdownDocumentRenderer()
 
-        let directPayload = try renderer.render(fileAt: url)
+        let directPayload = try await MainActor.run {
+            try renderer.render(fileAt: url)
+        }
         let preparedDocument = try renderer.prepareDocument(fileAt: url)
-        let preparedPayload = renderer.render(document: preparedDocument)
+        let preparedPayload = await MainActor.run {
+            renderer.render(document: preparedDocument)
+        }
 
         XCTAssertEqual(preparedDocument.title, url.lastPathComponent)
         XCTAssertEqual(preparedPayload.title, directPayload.title)
@@ -318,7 +323,9 @@ final class MarkdownDocumentRendererTests: XCTestCase {
             try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
         }.value
 
-        let payload = MarkdownDocumentRenderer().render(document: preparedDocument)
+        let payload = await MainActor.run {
+            MarkdownDocumentRenderer().render(document: preparedDocument)
+        }
 
         XCTAssertEqual(preparedDocument.title, url.lastPathComponent)
         XCTAssertTrue(payload.attributedContent.string.contains("Title"))

@@ -1,7 +1,7 @@
 import XCTest
 
 final class PreviewRequestTrackerTests: XCTestCase {
-    func testBeginRequestSupersedesEarlierRequest() {
+    func testNewerRequestMakesOlderResultStale() {
         var tracker = PreviewRequestTracker()
 
         let firstRequestID = tracker.beginRequest()
@@ -11,7 +11,7 @@ final class PreviewRequestTrackerTests: XCTestCase {
         XCTAssertTrue(tracker.isActive(secondRequestID))
     }
 
-    func testFinishRequestIgnoresStaleRequest() {
+    func testCompletingOlderRequestDoesNotClearNewerRequest() {
         var tracker = PreviewRequestTracker()
 
         let firstRequestID = tracker.beginRequest()
@@ -21,5 +21,15 @@ final class PreviewRequestTrackerTests: XCTestCase {
         XCTAssertTrue(tracker.isActive(secondRequestID))
         XCTAssertTrue(tracker.finishRequest(secondRequestID))
         XCTAssertNil(tracker.activeRequestID)
+    }
+
+    func testCancelRequestClearsCurrentRequest() {
+        var tracker = PreviewRequestTracker()
+
+        let requestID = tracker.beginRequest()
+
+        XCTAssertTrue(tracker.cancelRequest(requestID))
+        XCTAssertNil(tracker.activeRequestID)
+        XCTAssertFalse(tracker.isActive(requestID))
     }
 }
