@@ -15,10 +15,14 @@ It is best effort for regular `.md` files, which means Finder may not always pic
 
 [Download latest release](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
 
+**Important:** macOS will block this app because it is unsigned and may tell you to move it to Trash. After you try to open `MarkdownQuickLook.app` once, open `System Settings` > `Privacy & Security`, explicitly allow the app there, and then open it again from `/Applications`.
+
 1. Download `MarkdownQuickLook-macOS.zip` from GitHub Releases.
 2. Unzip it.
 3. Drag `MarkdownQuickLook.app` into `/Applications`.
-4. Control-click the app and choose `Open` the first time, then click `Close App` after that required launch. The app is unsigned.
+4. Try to open `MarkdownQuickLook.app` once from `/Applications`.
+5. If macOS blocks it or tells you to move it to Trash, open `System Settings` > `Privacy & Security` and explicitly allow `MarkdownQuickLook.app`.
+6. Open `MarkdownQuickLook.app` again from `/Applications`, then click `Close App`. You should not need to open it again after that first successful launch.
 
 ## Use
 
