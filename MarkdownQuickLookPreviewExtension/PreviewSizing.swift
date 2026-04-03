@@ -2,6 +2,7 @@ import AppKit
 
 enum PreviewSizing {
     static let loadingPreferredContentSize = CGSize(width: 900, height: 800)
+    static let errorPreferredContentSize = CGSize(width: 900, height: 800)
 
     private static let renderedWidth: CGFloat = 900
     private static let renderedBaseHeight: CGFloat = 900

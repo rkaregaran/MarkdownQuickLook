@@ -10,6 +10,13 @@ final class PreviewSizingTests: XCTestCase {
         )
     }
 
+    func testErrorSize() {
+        XCTAssertEqual(
+            PreviewSizing.errorPreferredContentSize,
+            CGSize(width: 900, height: 800)
+        )
+    }
+
     func testShortContentUsesBaseHeight() {
         XCTAssertEqual(
             PreviewSizing.preferredContentSize(forRenderedText: "Short content"),
