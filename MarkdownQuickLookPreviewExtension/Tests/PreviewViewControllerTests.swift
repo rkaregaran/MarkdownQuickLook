@@ -18,6 +18,7 @@ final class PreviewViewControllerTests: XCTestCase {
         )
 
         controller.loadViewIfNeeded()
+        XCTAssertEqual(controller.preferredContentSize, PreviewSizing.loadingPreferredContentSize)
 
         try await controller.preparePreviewOfFile(at: url)
 
@@ -25,6 +26,10 @@ final class PreviewViewControllerTests: XCTestCase {
         XCTAssertEqual(rootView.title, "Rendered.md")
         XCTAssertEqual(rootView.attributedContent?.string, "Rendered content")
         XCTAssertNil(rootView.message)
+        XCTAssertEqual(
+            controller.preferredContentSize,
+            PreviewSizing.preferredContentSize(forRenderedText: "Rendered content")
+        )
     }
 
     func testPreparePreviewMapsRendererErrorsToMessageState() async throws {
@@ -38,6 +43,7 @@ final class PreviewViewControllerTests: XCTestCase {
         )
 
         controller.loadViewIfNeeded()
+        XCTAssertEqual(controller.preferredContentSize, PreviewSizing.loadingPreferredContentSize)
 
         try await controller.preparePreviewOfFile(at: url)
 
@@ -45,6 +51,7 @@ final class PreviewViewControllerTests: XCTestCase {
         XCTAssertEqual(rootView.title, "Empty.md")
         XCTAssertEqual(rootView.message, MarkdownDocumentRendererError.emptyDocument(url).errorDescription)
         XCTAssertNil(rootView.attributedContent)
+        XCTAssertEqual(controller.preferredContentSize, PreviewSizing.errorPreferredContentSize)
     }
 
     func testStaleRequestDoesNotOverrideNewerPreviewState() async throws {

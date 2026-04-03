@@ -49,6 +49,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        preferredContentSize = PreviewSizing.loadingPreferredContentSize
 
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(hostingView)
@@ -62,6 +63,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     func preparePreviewOfFile(at url: URL) async throws {
+        preferredContentSize = PreviewSizing.loadingPreferredContentSize
         let request = loadingCoordinator.beginRequest {
             self.prepareDocumentResultProvider(url)
         }
@@ -96,6 +98,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     message: nil,
                     attributedContent: payload.attributedContent
                 )
+                preferredContentSize = PreviewSizing.preferredContentSize(
+                    forRenderedText: payload.attributedContent.string
+                )
             case .rendererError(let error):
                 guard loadingCoordinator.finishRequest(request.requestID) else {
                     return
@@ -105,6 +110,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     message: error.errorDescription,
                     attributedContent: nil
                 )
+                preferredContentSize = PreviewSizing.errorPreferredContentSize
             case .failure(let message):
                 guard loadingCoordinator.finishRequest(request.requestID) else {
                     return
@@ -114,6 +120,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     message: message,
                     attributedContent: nil
                 )
+                preferredContentSize = PreviewSizing.errorPreferredContentSize
             case .cancelled:
                 _ = loadingCoordinator.cancelRequest(request.requestID, task: request.task)
             }
