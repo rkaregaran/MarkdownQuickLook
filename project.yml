@@ -13,6 +13,7 @@ targets:
       - path: MarkdownQuickLookApp/App
     settings:
       base:
+        PRODUCT_NAME: MarkdownQuickLook
         PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app
         INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
         GENERATE_INFOPLIST_FILE: NO
@@ -40,6 +41,20 @@ targets:
         ENABLE_USER_SELECTED_FILES: readonly
     dependencies:
       - target: MarkdownRendering
+
+  MarkdownQuickLookAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownQuickLookApp/App/InstallExperience.swift
+      - path: MarkdownQuickLookApp/Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.appTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
 
   MarkdownRendering:
     type: framework.static
