@@ -2,6 +2,7 @@
 .derivedData/
 .build/
 .superpowers/
+.worktrees/
 MarkdownQuickLook.xcodeproj/
 *.xcworkspace/
 *.xcuserstate
