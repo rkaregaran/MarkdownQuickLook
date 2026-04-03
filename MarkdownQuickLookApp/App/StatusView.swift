@@ -2,37 +2,39 @@ import SwiftUI
 import AppKit
 
 struct StatusView: View {
+    private let experience = InstallExperience.current()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: experience.state == .installed ? "checkmark.circle.fill" : "arrow.down.app.fill")
                 .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(experience.state == .installed ? .green : .orange)
 
-            Text(InstallExperience.headline)
+            Text(experience.headline)
                 .font(.system(.title, design: .rounded).weight(.bold))
 
-            Text(InstallExperience.bodyText)
+            Text(experience.bodyText)
                 .font(.body)
                 .foregroundStyle(.secondary)
 
-            Text(InstallExperience.reassuranceText)
+            Text(experience.reassuranceText)
                 .font(.body.weight(.medium))
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("How to use it")
+                Text(experience.stepsTitle)
                 .font(.headline)
 
-                ForEach(InstallExperience.usageSteps, id: \.self) { step in
+                ForEach(experience.usageSteps, id: \.self) { step in
                     Text("• \(step)")
                         .font(.body)
                 }
             }
 
-            Text(InstallExperience.caveatText)
+            Text(experience.caveatText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            Button(InstallExperience.primaryActionTitle) {
+            Button(experience.primaryActionTitle) {
                 NSApp.terminate(nil)
             }
             .buttonStyle(.borderedProminent)
