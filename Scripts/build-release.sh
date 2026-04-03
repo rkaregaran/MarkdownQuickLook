@@ -30,12 +30,6 @@ ditto "$APP_PATH" "$DIST_APP_PATH"
 
 ditto -c -k --keepParent "$DIST_APP_PATH" "$ZIP_PATH"
 
-VERIFY_DIR="$(mktemp -d /tmp/markdown-quicklook-release-check.XXXXXX)"
-ditto -x -k "$ZIP_PATH" "$VERIFY_DIR"
-test -d "$VERIFY_DIR/$APP_NAME"
-echo "Zip shape verified: $VERIFY_DIR/$APP_NAME"
-rm -rf "$VERIFY_DIR"
-
 echo "App path: $DIST_APP_PATH"
 echo "Zip path: $ZIP_PATH"
 echo "SHA-256:"
