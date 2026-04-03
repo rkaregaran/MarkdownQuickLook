@@ -46,3 +46,14 @@ Build a release package:
 ```bash
 ./Scripts/build-release.sh
 ```
+
+## Automated Releases
+
+Every push to `main` creates a new rolling GitHub prerelease through GitHub Actions.
+Each prerelease uploads `MarkdownQuickLook-macOS.zip`, which expands to `MarkdownQuickLook.app` and `LICENSE`.
+
+Local release packaging is still available with:
+
+```bash
+./Scripts/build-release.sh
+```
