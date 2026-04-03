@@ -5,6 +5,10 @@ final class PreviewLoadingCoordinator<Output> {
     private var requestTracker = PreviewRequestTracker()
     private(set) var activeTask: Task<Output, Never>?
 
+    var hasActiveRequest: Bool {
+        requestTracker.hasActiveRequest
+    }
+
     func beginRequest(
         priority: TaskPriority = .userInitiated,
         operation: @escaping @Sendable () -> Output
@@ -16,6 +20,10 @@ final class PreviewLoadingCoordinator<Output> {
         activeTask = task
 
         return (requestID, task)
+    }
+
+    func isActive(_ requestID: UUID) -> Bool {
+        requestTracker.isActive(requestID)
     }
 
     @discardableResult

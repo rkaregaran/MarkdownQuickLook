@@ -24,7 +24,11 @@ qlmanage -r cache
 
 echo
 echo "Extension registration:"
-REGISTRATION_OUTPUT="$(pluginkit -m -A | rg 'MarkdownQuickLook' || true)"
+if command -v rg >/dev/null 2>&1; then
+  REGISTRATION_OUTPUT="$(pluginkit -m -A | rg 'MarkdownQuickLook' || true)"
+else
+  REGISTRATION_OUTPUT="$(pluginkit -m -A | grep 'MarkdownQuickLook' || true)"
+fi
 if [[ -n "$REGISTRATION_OUTPUT" ]]; then
   echo "$REGISTRATION_OUTPUT"
 else

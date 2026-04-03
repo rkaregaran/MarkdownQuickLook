@@ -3,6 +3,10 @@ import Foundation
 struct PreviewRequestTracker {
     private(set) var activeRequestID: UUID?
 
+    var hasActiveRequest: Bool {
+        activeRequestID != nil
+    }
+
     mutating func beginRequest() -> UUID {
         let requestID = UUID()
         activeRequestID = requestID

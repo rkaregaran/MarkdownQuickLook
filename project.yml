@@ -72,6 +72,9 @@ targets:
     platform: macOS
     deploymentTarget: "14.0"
     sources:
+      - path: MarkdownQuickLookPreviewExtension/MarkdownTextView.swift
+      - path: MarkdownQuickLookPreviewExtension/PreviewRootView.swift
+      - path: MarkdownQuickLookPreviewExtension/PreviewViewController.swift
       - path: MarkdownQuickLookPreviewExtension/Tests
       - path: MarkdownQuickLookPreviewExtension/PreviewLoadingCoordinator.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewRequestTracker.swift
@@ -81,3 +84,5 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: ""
         BUNDLE_LOADER: ""
+    dependencies:
+      - target: MarkdownRendering

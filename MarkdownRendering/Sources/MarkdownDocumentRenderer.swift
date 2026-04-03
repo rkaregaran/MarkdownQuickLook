@@ -53,6 +53,7 @@ public final class MarkdownDocumentRenderer {
     public init() {}
 
     public func prepareDocument(fileAt url: URL) throws -> MarkdownPreparedDocument {
+        try throwIfCancelled()
         let source: String
 
         do {
@@ -61,6 +62,8 @@ public final class MarkdownDocumentRenderer {
             throw MarkdownDocumentRendererError.unreadableFile(url)
         }
 
+        try throwIfCancelled()
+
         guard source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             throw MarkdownDocumentRendererError.emptyDocument(url)
         }
@@ -68,7 +71,7 @@ public final class MarkdownDocumentRenderer {
         return MarkdownPreparedDocument(
             title: url.lastPathComponent,
             baseURL: url.deletingLastPathComponent(),
-            blocks: parseBlocks(in: source)
+            blocks: try parseBlocks(in: source)
         )
     }
 
@@ -91,23 +94,50 @@ public final class MarkdownDocumentRenderer {
     }
 
     @MainActor
+    public func render(
+        document: MarkdownPreparedDocument,
+        shouldContinue: @escaping @MainActor @Sendable () -> Bool
+    ) async throws -> MarkdownRenderPayload {
+        let formatted = NSMutableAttributedString()
+
+        for (index, block) in document.blocks.enumerated() {
+            try ensureRenderingCanContinue(shouldContinue)
+            append(block, to: formatted, baseURL: document.baseURL)
+
+            if index < document.blocks.count - 1 {
+                formatted.append(NSAttributedString(string: "\n\n"))
+                await Task.yield()
+            }
+        }
+
+        try ensureRenderingCanContinue(shouldContinue)
+
+        return MarkdownRenderPayload(
+            title: document.title,
+            attributedContent: NSAttributedString(attributedString: formatted)
+        )
+    }
+
+    @MainActor
     public func render(fileAt url: URL) throws -> MarkdownRenderPayload {
         try render(document: prepareDocument(fileAt: url))
     }
 
-    private func parseBlocks(in source: String) -> [MarkdownBlock] {
+    private func parseBlocks(in source: String) throws -> [MarkdownBlock] {
         let normalizedSource = normalizeLineEndings(in: source)
         let lines = normalizedSource.components(separatedBy: .newlines)
         var blocks: [MarkdownBlock] = []
         var index = 0
 
         while index < lines.count {
+            try throwIfCancelled()
+
             if lines[index].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 index += 1
                 continue
             }
 
-            if let codeBlock = parseFencedCodeBlock(from: lines, startingAt: index) {
+            if let codeBlock = try parseFencedCodeBlock(from: lines, startingAt: index) {
                 blocks.append(.code(codeBlock.text))
                 index = codeBlock.nextIndex
                 continue
@@ -119,19 +149,19 @@ public final class MarkdownDocumentRenderer {
                 continue
             }
 
-            if let quote = parseQuoteBlock(from: lines, startingAt: index) {
+            if let quote = try parseQuoteBlock(from: lines, startingAt: index) {
                 blocks.append(.quote(quote.paragraphs))
                 index = quote.nextIndex
                 continue
             }
 
-            if let list = parseListBlock(from: lines, startingAt: index) {
+            if let list = try parseListBlock(from: lines, startingAt: index) {
                 blocks.append(.list(list.items))
                 index = list.nextIndex
                 continue
             }
 
-            let paragraph = parseParagraph(from: lines, startingAt: index)
+            let paragraph = try parseParagraph(from: lines, startingAt: index)
             blocks.append(.paragraph(paragraph.text))
             index = paragraph.nextIndex
         }
@@ -139,7 +169,7 @@ public final class MarkdownDocumentRenderer {
         return blocks
     }
 
-    private func parseFencedCodeBlock(from lines: [String], startingAt index: Int) -> (text: String, nextIndex: Int)? {
+    private func parseFencedCodeBlock(from lines: [String], startingAt index: Int) throws -> (text: String, nextIndex: Int)? {
         guard isFenceLine(lines[index]) else {
             return nil
         }
@@ -148,6 +178,7 @@ public final class MarkdownDocumentRenderer {
         var cursor = index + 1
 
         while cursor < lines.count, isFenceLine(lines[cursor]) == false {
+            try throwIfCancelled()
             codeLines.append(lines[cursor])
             cursor += 1
         }
@@ -159,7 +190,7 @@ public final class MarkdownDocumentRenderer {
         return (codeLines.joined(separator: "\n"), cursor)
     }
 
-    private func parseQuoteBlock(from lines: [String], startingAt index: Int) -> (paragraphs: [String], nextIndex: Int)? {
+    private func parseQuoteBlock(from lines: [String], startingAt index: Int) throws -> (paragraphs: [String], nextIndex: Int)? {
         guard isQuoteLine(lines[index]) else {
             return nil
         }
@@ -169,6 +200,7 @@ public final class MarkdownDocumentRenderer {
         var cursor = index
 
         while cursor < lines.count, isQuoteLine(lines[cursor]) {
+            try throwIfCancelled()
             let content = quoteContent(from: lines[cursor])
 
             if content.isEmpty {
@@ -190,7 +222,7 @@ public final class MarkdownDocumentRenderer {
         return (paragraphs, cursor)
     }
 
-    private func parseListBlock(from lines: [String], startingAt index: Int) -> (items: [MarkdownListItem], nextIndex: Int)? {
+    private func parseListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
         guard isBulletLine(lines[index]) else {
             return nil
         }
@@ -199,7 +231,8 @@ public final class MarkdownDocumentRenderer {
         var cursor = index
 
         while cursor < lines.count, isBulletLine(lines[cursor]) {
-            let item = parseListItem(from: lines, startingAt: cursor)
+            try throwIfCancelled()
+            let item = try parseListItem(from: lines, startingAt: cursor)
             items.append(item.item)
             cursor = item.nextIndex
         }
@@ -207,13 +240,14 @@ public final class MarkdownDocumentRenderer {
         return (items, cursor)
     }
 
-    private func parseListItem(from lines: [String], startingAt index: Int) -> (item: MarkdownListItem, nextIndex: Int) {
+    private func parseListItem(from lines: [String], startingAt index: Int) throws -> (item: MarkdownListItem, nextIndex: Int) {
         let firstLine = bulletContent(from: lines[index]) ?? ""
         var paragraphs: [String] = []
         var currentParagraph = firstLine
         var cursor = index + 1
 
         while cursor < lines.count {
+            try throwIfCancelled()
             let line = lines[cursor]
 
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -256,11 +290,12 @@ public final class MarkdownDocumentRenderer {
         return (MarkdownListItem(paragraphs: paragraphs), cursor)
     }
 
-    private func parseParagraph(from lines: [String], startingAt index: Int) -> (text: String, nextIndex: Int) {
+    private func parseParagraph(from lines: [String], startingAt index: Int) throws -> (text: String, nextIndex: Int) {
         var parts = [lines[index].trimmingCharacters(in: .whitespaces)]
         var cursor = index + 1
 
         while cursor < lines.count {
+            try throwIfCancelled()
             let line = lines[cursor]
 
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -412,6 +447,23 @@ public final class MarkdownDocumentRenderer {
         ]
 
         output.append(NSAttributedString(string: code, attributes: attributes))
+    }
+
+    private func throwIfCancelled() throws {
+        if Task.isCancelled {
+            throw CancellationError()
+        }
+    }
+
+    @MainActor
+    private func ensureRenderingCanContinue(
+        _ shouldContinue: @MainActor @Sendable () -> Bool
+    ) throws {
+        try throwIfCancelled()
+
+        guard shouldContinue() else {
+            throw CancellationError()
+        }
     }
 
     private func paragraphAttributes() -> [NSAttributedString.Key: Any] {
