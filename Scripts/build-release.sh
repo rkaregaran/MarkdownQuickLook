@@ -26,22 +26,7 @@ xcodebuild \
 
 ditto "$APP_PATH" "$DIST_APP_PATH"
 
-EXTENSION_DIR="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/MacOS"
-EXTENSION_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension"
-EXTENSION_DEBUG_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension.debug.dylib"
-
-if [[ -f "$EXTENSION_BINARY" && ! -f "$EXTENSION_DEBUG_BINARY" ]]; then
-  cp "$EXTENSION_BINARY" "$EXTENSION_DEBUG_BINARY"
-  TEMP_DEBUG_EXTENSION_CREATED=1
-else
-  TEMP_DEBUG_EXTENSION_CREATED=0
-fi
-
 "$ROOT/Scripts/check-preview-runtime.sh" "$DIST_APP_PATH"
-
-if [[ "$TEMP_DEBUG_EXTENSION_CREATED" -eq 1 ]]; then
-  rm -f "$EXTENSION_DEBUG_BINARY"
-fi
 
 ditto -c -k --keepParent "$DIST_APP_PATH" "$ZIP_PATH"
 

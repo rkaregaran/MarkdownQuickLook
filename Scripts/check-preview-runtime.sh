@@ -26,17 +26,24 @@ else
     build >/dev/null
 fi
 
-EXTENSION_DYLIB="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/MacOS/MarkdownQuickLookPreviewExtension.debug.dylib"
+EXTENSION_DIR="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/MacOS"
+EXTENSION_DEBUG_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension.debug.dylib"
+EXTENSION_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension"
 EXTENSION_FRAMEWORK="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/Frameworks/MarkdownRendering.framework"
 APP_FRAMEWORK="$APP_PATH/Contents/Frameworks/MarkdownRendering.framework"
 
-if [[ ! -f "$EXTENSION_DYLIB" ]]; then
+if [[ -f "$EXTENSION_DEBUG_BINARY" ]]; then
+  EXTENSION_PATH="$EXTENSION_DEBUG_BINARY"
+elif [[ -f "$EXTENSION_BINARY" ]]; then
+  EXTENSION_PATH="$EXTENSION_BINARY"
+else
   echo "Expected preview extension binary at:"
-  echo "  $EXTENSION_DYLIB"
+  echo "  $EXTENSION_DEBUG_BINARY"
+  echo "  $EXTENSION_BINARY"
   exit 1
 fi
 
-DEPENDENCIES="$(otool -L "$EXTENSION_DYLIB")"
+DEPENDENCIES="$(otool -L "$EXTENSION_PATH")"
 
 if [[ "$DEPENDENCIES" == *"@rpath/MarkdownRendering.framework/Versions/A/MarkdownRendering"* ]]; then
   if [[ -d "$EXTENSION_FRAMEWORK" || -d "$APP_FRAMEWORK" ]]; then
