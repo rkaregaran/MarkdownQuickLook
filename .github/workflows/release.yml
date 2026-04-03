@@ -1,0 +1,101 @@
+name: Release
+
+"on":
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Log and validate Xcode version
+        run: |
+          xcodebuild -version
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          required = (26, 1, 1)
+          output = subprocess.check_output(["xcodebuild", "-version"], text=True).splitlines()[0]
+          version_text = output.split()[1]
+          match = re.match(r"(\d+)\.(\d+)\.(\d+)", version_text)
+          if match is None:
+              raise SystemExit(f"Could not parse Xcode version from: {version_text}")
+
+          actual = tuple(int(part) for part in match.groups())
+          if actual < required:
+              raise SystemExit(
+                  f"Xcode {version_text} is older than required 26.1.1"
+              )
+
+          print(f"Using Xcode {version_text}")
+          PY
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run MarkdownRenderingTests
+        run: xcodebuild test -project MarkdownQuickLook.xcodeproj -scheme MarkdownRenderingTests -destination 'platform=macOS'
+
+      - name: Run MarkdownQuickLookPreviewExtensionTests
+        run: xcodebuild test -project MarkdownQuickLook.xcodeproj -scheme MarkdownQuickLookPreviewExtensionTests -destination 'platform=macOS'
+
+      - name: Run MarkdownQuickLookAppTests
+        run: xcodebuild test -project MarkdownQuickLook.xcodeproj -scheme MarkdownQuickLookAppTests -destination 'platform=macOS'
+
+      - name: Build release artifact
+        run: ./Scripts/build-release.sh
+
+      - name: Derive rolling release metadata
+        id: release_meta
+        shell: bash
+        run: |
+          timestamp="$(date -u +'%Y%m%d-%H%M%S')"
+          short_sha="${GITHUB_SHA::7}"
+          tag="main-${timestamp}-${short_sha}"
+          title="Rolling release ${tag}"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          {
+            echo "tag=${tag}"
+            echo "title=${title}"
+            echo "run_url=${run_url}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release_meta.outputs.title }}
+          RELEASE_RUN_URL: ${{ steps.release_meta.outputs.run_url }}
+        shell: bash
+        run: |
+          cat > release-notes.txt <<EOF
+          Automated rolling build from main.
+
+          Commit: ${GITHUB_SHA}
+          Run: ${RELEASE_RUN_URL}
+          EOF
+
+          gh release create "${RELEASE_TAG}" \
+            dist/MarkdownQuickLook-macOS.zip \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${RELEASE_TITLE}" \
+            --notes-file release-notes.txt \
+            --prerelease
