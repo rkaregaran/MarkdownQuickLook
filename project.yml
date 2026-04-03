@@ -42,7 +42,7 @@ targets:
       - target: MarkdownRendering
 
   MarkdownRendering:
-    type: framework
+    type: framework.static
     platform: macOS
     deploymentTarget: "14.0"
     sources:

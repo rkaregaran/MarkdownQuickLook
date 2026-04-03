@@ -16,6 +16,8 @@ xcodebuild \
 
 APP_PATH="$ROOT/.derivedData/Build/Products/Debug/MarkdownQuickLookApp.app"
 
+"$ROOT/Scripts/check-preview-runtime.sh" "$APP_PATH"
+
 open "$APP_PATH"
 
 sleep 2
