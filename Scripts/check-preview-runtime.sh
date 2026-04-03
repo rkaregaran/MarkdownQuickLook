@@ -27,23 +27,30 @@ else
 fi
 
 EXTENSION_DIR="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/MacOS"
-EXTENSION_DEBUG_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension.debug.dylib"
 EXTENSION_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension"
+EXTENSION_DEBUG_BINARY="$EXTENSION_DIR/MarkdownQuickLookPreviewExtension.debug.dylib"
 EXTENSION_FRAMEWORK="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex/Contents/Frameworks/MarkdownRendering.framework"
 APP_FRAMEWORK="$APP_PATH/Contents/Frameworks/MarkdownRendering.framework"
 
-if [[ -f "$EXTENSION_DEBUG_BINARY" ]]; then
-  EXTENSION_PATH="$EXTENSION_DEBUG_BINARY"
-elif [[ -f "$EXTENSION_BINARY" ]]; then
-  EXTENSION_PATH="$EXTENSION_BINARY"
-else
+if [[ ! -f "$EXTENSION_BINARY" ]]; then
   echo "Expected preview extension binary at:"
-  echo "  $EXTENSION_DEBUG_BINARY"
   echo "  $EXTENSION_BINARY"
   exit 1
 fi
 
+EXTENSION_PATH="$EXTENSION_BINARY"
 DEPENDENCIES="$(otool -L "$EXTENSION_PATH")"
+
+if [[ "$DEPENDENCIES" == *"MarkdownQuickLookPreviewExtension.debug.dylib"* ]]; then
+  if [[ ! -f "$EXTENSION_DEBUG_BINARY" ]]; then
+    echo "Expected preview extension debug shim at:"
+    echo "  $EXTENSION_DEBUG_BINARY"
+    exit 1
+  fi
+
+  EXTENSION_PATH="$EXTENSION_DEBUG_BINARY"
+  DEPENDENCIES="$(otool -L "$EXTENSION_PATH")"
+fi
 
 if [[ "$DEPENDENCIES" == *"@rpath/MarkdownRendering.framework/Versions/A/MarkdownRendering"* ]]; then
   if [[ -d "$EXTENSION_FRAMEWORK" || -d "$APP_FRAMEWORK" ]]; then
