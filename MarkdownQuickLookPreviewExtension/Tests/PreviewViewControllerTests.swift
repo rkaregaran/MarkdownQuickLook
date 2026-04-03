@@ -90,6 +90,50 @@ final class PreviewViewControllerTests: XCTestCase {
         XCTAssertEqual(rootView.attributedContent?.string, "Fast.md")
     }
 
+    func testNewPreviewResetsPreferredContentSizeToLoadingState() async throws {
+        let renderedURL = try makeMarkdownFile(named: "Rendered.md", contents: "# Rendered")
+        let slowURL = try makeMarkdownFile(named: "Slow.md", contents: "# Slow")
+        let renderedDocument = try MarkdownDocumentRenderer().prepareDocument(fileAt: renderedURL)
+        let slowDocument = try MarkdownDocumentRenderer().prepareDocument(fileAt: slowURL)
+        let controller = PreviewViewController(
+            prepareDocumentResultProvider: { url in
+                if url == renderedURL {
+                    return .prepared(renderedDocument)
+                }
+
+                Thread.sleep(forTimeInterval: 0.05)
+                return .prepared(slowDocument)
+            },
+            renderProvider: { document, _ in
+                MarkdownRenderPayload(
+                    title: document.title,
+                    attributedContent: NSAttributedString(string: document.title)
+                )
+            }
+        )
+
+        controller.loadViewIfNeeded()
+
+        try await controller.preparePreviewOfFile(at: renderedURL)
+        XCTAssertEqual(
+            controller.preferredContentSize,
+            PreviewSizing.preferredContentSize(forRenderedText: "Rendered.md")
+        )
+
+        let slowTask = Task {
+            try await controller.preparePreviewOfFile(at: slowURL)
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        XCTAssertEqual(controller.preferredContentSize, PreviewSizing.loadingPreferredContentSize)
+
+        _ = await slowTask.result
+        XCTAssertEqual(
+            controller.preferredContentSize,
+            PreviewSizing.preferredContentSize(forRenderedText: "Slow.md")
+        )
+    }
+
     func testCancelledPreviewKeepsLoadingStateAndClearsActiveRequest() async throws {
         let url = try makeMarkdownFile(named: "Cancelled.md", contents: "# Cancelled")
         let document = try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
@@ -121,6 +165,27 @@ final class PreviewViewControllerTests: XCTestCase {
         XCTAssertEqual(rootView.message, "Loading preview...")
         XCTAssertNil(rootView.attributedContent)
         XCTAssertFalse(controller.testingHasActiveRequest)
+    }
+
+    func testGenericFailureMapsToErrorPreferredContentSize() async throws {
+        let url = try makeMarkdownFile(named: "Broken.md", contents: "# Broken")
+        let controller = PreviewViewController(
+            prepareDocumentResultProvider: { _ in .failure("Broken document") },
+            renderProvider: { _, _ in
+                XCTFail("Render should not run for generic failures.")
+                return MarkdownRenderPayload(title: "", attributedContent: NSAttributedString())
+            }
+        )
+
+        controller.loadViewIfNeeded()
+
+        try await controller.preparePreviewOfFile(at: url)
+
+        let rootView = controller.testingCurrentRootView
+        XCTAssertEqual(rootView.title, "Broken.md")
+        XCTAssertEqual(rootView.message, "Broken document")
+        XCTAssertNil(rootView.attributedContent)
+        XCTAssertEqual(controller.preferredContentSize, PreviewSizing.errorPreferredContentSize)
     }
 
     private func makeMarkdownFile(named name: String, contents: String) throws -> URL {
