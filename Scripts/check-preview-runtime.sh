@@ -13,7 +13,7 @@ if [[ $# -eq 1 ]]; then
   APP_PATH="$1"
 else
   DERIVED_DATA_PATH="$ROOT/.derivedData/runtime-check"
-  APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/MarkdownQuickLookApp.app"
+  APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/MarkdownQuickLook.app"
 
   xcodegen generate
 

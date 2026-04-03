@@ -14,7 +14,7 @@ xcodebuild \
   -derivedDataPath "$ROOT/.derivedData" \
   build
 
-APP_PATH="$ROOT/.derivedData/Build/Products/Debug/MarkdownQuickLookApp.app"
+APP_PATH="$ROOT/.derivedData/Build/Products/Debug/MarkdownQuickLook.app"
 
 "$ROOT/Scripts/check-preview-runtime.sh" "$APP_PATH"
 
