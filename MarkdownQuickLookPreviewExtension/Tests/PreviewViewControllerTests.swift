@@ -54,6 +54,34 @@ final class PreviewViewControllerTests: XCTestCase {
         XCTAssertEqual(controller.preferredContentSize, PreviewSizing.errorPreferredContentSize)
     }
 
+    func testLoadingViewAfterPreparedPreviewPreservesComputedPreferredContentSize() async throws {
+        let url = try makeMarkdownFile(named: "Prepared.md", contents: "# Prepared")
+        let document = try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
+        let controller = PreviewViewController(
+            prepareDocumentResultProvider: { _ in .prepared(document) },
+            renderProvider: { document, _ in
+                MarkdownRenderPayload(
+                    title: document.title,
+                    attributedContent: NSAttributedString(string: "Prepared content")
+                )
+            }
+        )
+
+        try await controller.preparePreviewOfFile(at: url)
+
+        XCTAssertEqual(
+            controller.preferredContentSize,
+            PreviewSizing.preferredContentSize(forRenderedText: "Prepared content")
+        )
+
+        controller.loadViewIfNeeded()
+
+        XCTAssertEqual(
+            controller.preferredContentSize,
+            PreviewSizing.preferredContentSize(forRenderedText: "Prepared content")
+        )
+    }
+
     func testStaleRequestDoesNotOverrideNewerPreviewState() async throws {
         let slowURL = try makeMarkdownFile(named: "Slow.md", contents: "# Slow")
         let fastURL = try makeMarkdownFile(named: "Fast.md", contents: "# Fast")

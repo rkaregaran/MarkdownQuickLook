@@ -49,7 +49,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        preferredContentSize = PreviewSizing.loadingPreferredContentSize
+        if preferredContentSize == .zero {
+            preferredContentSize = PreviewSizing.loadingPreferredContentSize
+        }
 
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(hostingView)
