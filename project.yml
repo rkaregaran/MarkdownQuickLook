@@ -87,6 +87,7 @@ targets:
     platform: macOS
     deploymentTarget: "14.0"
     sources:
+      - path: MarkdownQuickLookPreviewExtension/PreviewSizing.swift
       - path: MarkdownQuickLookPreviewExtension/MarkdownTextView.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewRootView.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewViewController.swift
