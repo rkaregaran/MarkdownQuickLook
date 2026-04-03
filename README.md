@@ -1,6 +1,7 @@
 # Markdown Quick Look
 
 Markdown Quick Look is a macOS Quick Look app for previewing standard Markdown files in Finder.
+It requires macOS 14.0 or newer.
 
 It is best effort for regular `.md` files, which means Finder may not always pick it over the built-in plain-text preview.
 
@@ -9,8 +10,7 @@ It is best effort for regular `.md` files, which means Finder may not always pic
 1. Download `MarkdownQuickLook-macOS.zip` from GitHub Releases.
 2. Unzip it.
 3. Drag `MarkdownQuickLook.app` into `/Applications`.
-4. Control-click the app and choose `Open` the first time, because the app is unsigned.
-5. Launch it once, then click `Close App`.
+4. Control-click the app and choose `Open` the first time, then click `Close App` after that required launch. The app is unsigned.
 
 ## Use
 
