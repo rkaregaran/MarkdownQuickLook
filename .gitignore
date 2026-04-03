@@ -1,6 +1,7 @@
 .DS_Store
 .derivedData/
 .build/
+dist/
 .superpowers/
 .worktrees/
 MarkdownQuickLook.xcodeproj/
