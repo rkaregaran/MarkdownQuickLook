@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
       - name: Check out repository
@@ -34,11 +34,11 @@ jobs:
           required = (26, 1, 1)
           output = subprocess.check_output(["xcodebuild", "-version"], text=True).splitlines()[0]
           version_text = output.split()[1]
-          match = re.match(r"(\d+)\.(\d+)\.(\d+)", version_text)
+          match = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", version_text)
           if match is None:
               raise SystemExit(f"Could not parse Xcode version from: {version_text}")
 
-          actual = tuple(int(part) for part in match.groups())
+          actual = tuple(int(part) for part in match.groups(default="0"))
           if actual < required:
               raise SystemExit(
                   f"Xcode {version_text} is older than required 26.1.1"
@@ -98,4 +98,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "${RELEASE_TITLE}" \
             --notes-file release-notes.txt \
+            --target "${GITHUB_SHA}" \
             --prerelease
