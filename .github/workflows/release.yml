@@ -78,7 +78,7 @@ jobs:
             echo "run_url=${run_url}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub prerelease
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
@@ -98,5 +98,4 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "${RELEASE_TITLE}" \
             --notes-file release-notes.txt \
-            --target "${GITHUB_SHA}" \
-            --prerelease
+            --target "${GITHUB_SHA}"

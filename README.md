@@ -49,8 +49,8 @@ Build a release package:
 
 ## Automated Releases
 
-Every push to `main` creates a new rolling GitHub prerelease through GitHub Actions.
-Each prerelease uploads `MarkdownQuickLook-macOS.zip`, which expands to `MarkdownQuickLook.app` and `LICENSE`.
+Every push to `main` creates a new rolling GitHub release through GitHub Actions.
+Each release uploads `MarkdownQuickLook-macOS.zip`, which expands to `MarkdownQuickLook.app` and `LICENSE`.
 
 Local release packaging is still available with:
 
