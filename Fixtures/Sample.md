@@ -15,3 +15,12 @@ This file checks the app's best-effort preview path for standard `.md` files.
 let greeting = "hello, quick look"
 print(greeting)
 ```
+
+## Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Headings | Supported | h1 through h6 |
+| Lists | Supported | Bullet lists |
+| Code blocks | Supported | Fenced with ``` |
+| Tables | Supported | Pipe-delimited |

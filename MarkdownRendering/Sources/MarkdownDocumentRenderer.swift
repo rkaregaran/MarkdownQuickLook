@@ -31,6 +31,12 @@ enum MarkdownBlock: Sendable {
     case quote([String])
     case list([MarkdownListItem])
     case code(String)
+    case table(MarkdownTable)
+}
+
+struct MarkdownTable: Sendable {
+    let headers: [String]
+    let rows: [[String]]
 }
 
 struct MarkdownListItem: Sendable {
@@ -156,6 +162,12 @@ public final class MarkdownDocumentRenderer {
             if let list = try parseListBlock(from: lines, startingAt: index) {
                 blocks.append(.list(list.items))
                 index = list.nextIndex
+                continue
+            }
+
+            if let table = try parseTableBlock(from: lines, startingAt: index) {
+                blocks.append(.table(table.table))
+                index = table.nextIndex
                 continue
             }
 
@@ -288,6 +300,53 @@ public final class MarkdownDocumentRenderer {
         return (MarkdownListItem(paragraphs: paragraphs), cursor)
     }
 
+    private func parseTableBlock(from lines: [String], startingAt index: Int) throws -> (table: MarkdownTable, nextIndex: Int)? {
+        guard isTableLine(lines[index]) else { return nil }
+
+        // Need at least a header row and a separator row.
+        guard index + 1 < lines.count, isTableSeparatorLine(lines[index + 1]) else { return nil }
+
+        let headers = tableCells(from: lines[index])
+        var cursor = index + 2
+        var rows: [[String]] = []
+
+        while cursor < lines.count, isTableLine(lines[cursor]) {
+            try throwIfCancelled()
+            var cells = tableCells(from: lines[cursor])
+            // Pad or truncate to match header count.
+            while cells.count < headers.count { cells.append("") }
+            if cells.count > headers.count { cells = Array(cells.prefix(headers.count)) }
+            rows.append(cells)
+            cursor += 1
+        }
+
+        return (MarkdownTable(headers: headers, rows: rows), cursor)
+    }
+
+    private func isTableLine(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("|") else { return false }
+        // Must have at least two pipes (start and one delimiter).
+        return trimmed.dropFirst().contains("|")
+    }
+
+    private func isTableSeparatorLine(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("|") else { return false }
+        let stripped = trimmed.replacingOccurrences(of: "|", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: ":", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        return stripped.isEmpty
+    }
+
+    private func tableCells(from line: String) -> [String] {
+        var trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("|") { trimmed = String(trimmed.dropFirst()) }
+        if trimmed.hasSuffix("|") { trimmed = String(trimmed.dropLast()) }
+        return trimmed.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
     private func parseParagraph(from lines: [String], startingAt index: Int) throws -> (text: String, nextIndex: Int) {
         var parts = [lines[index].trimmingCharacters(in: .whitespaces)]
         var cursor = index + 1
@@ -354,6 +413,9 @@ public final class MarkdownDocumentRenderer {
 
         case .code(let text):
             appendCodeBlock(text, to: output)
+
+        case .table(let table):
+            appendTable(table, to: output)
         }
     }
 
@@ -424,6 +486,51 @@ public final class MarkdownDocumentRenderer {
         default: base = 17
         }
         return base * settings.textSizeLevel.scaleFactor
+    }
+
+    private func appendTable(_ table: MarkdownTable, to output: NSMutableAttributedString) {
+        let scale = settings.textSizeLevel.scaleFactor
+        let font = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .regular)
+        let boldFont = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .semibold)
+
+        // Calculate column widths.
+        var widths = table.headers.map { $0.count }
+        for row in table.rows {
+            for (col, cell) in row.enumerated() where col < widths.count {
+                widths[col] = max(widths[col], cell.count)
+            }
+        }
+
+        let baseAttrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.labelColor,
+            .backgroundColor: NSColor.textBackgroundColor,
+            .paragraphStyle: codeParagraphStyle()
+        ]
+        let headerAttrs: [NSAttributedString.Key: Any] = [
+            .font: boldFont,
+            .foregroundColor: NSColor.labelColor,
+            .backgroundColor: NSColor.textBackgroundColor,
+            .paragraphStyle: codeParagraphStyle()
+        ]
+
+        func padded(_ cells: [String]) -> String {
+            cells.enumerated().map { i, cell in
+                cell.padding(toLength: widths[i], withPad: " ", startingAt: 0)
+            }.joined(separator: "  │  ")
+        }
+
+        // Header row.
+        output.append(NSAttributedString(string: padded(table.headers), attributes: headerAttrs))
+
+        // Separator.
+        let separator = widths.map { String(repeating: "─", count: $0) }.joined(separator: "──┼──")
+        output.append(NSAttributedString(string: "\n" + separator, attributes: baseAttrs))
+
+        // Data rows.
+        for row in table.rows {
+            output.append(NSAttributedString(string: "\n" + padded(row), attributes: baseAttrs))
+        }
     }
 
     private func appendCodeBlock(_ code: String, to output: NSMutableAttributedString) {
@@ -586,6 +693,10 @@ public final class MarkdownDocumentRenderer {
         }
 
         if isBulletLine(line) {
+            return true
+        }
+
+        if isTableLine(line) {
             return true
         }
 
