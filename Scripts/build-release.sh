@@ -21,7 +21,14 @@ mkdir -p "$DIST_DIR"
 
 signing_args=()
 if [[ "${CI:-}" == "true" ]]; then
-  signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
+  if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
+    signing_args=(
+      CODE_SIGN_IDENTITY="$DEVELOPER_ID_IDENTITY"
+      CODE_SIGN_STYLE=Manual
+    )
+  else
+    signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
+  fi
 fi
 
 xcodebuild \
