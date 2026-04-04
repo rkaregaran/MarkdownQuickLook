@@ -129,7 +129,7 @@ final class PreviewViewControllerTests: XCTestCase {
                     return .prepared(renderedDocument)
                 }
 
-                Thread.sleep(forTimeInterval: 0.05)
+                Thread.sleep(forTimeInterval: 0.5)
                 return .prepared(slowDocument)
             },
             renderProvider: { document, _ in
@@ -151,7 +151,7 @@ final class PreviewViewControllerTests: XCTestCase {
         let slowTask = Task {
             try await controller.preparePreviewOfFile(at: slowURL)
         }
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertEqual(controller.preferredContentSize, PreviewSizing.loadingPreferredContentSize)
 
