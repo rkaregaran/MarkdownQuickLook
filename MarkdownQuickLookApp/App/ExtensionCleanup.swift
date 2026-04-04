@@ -28,14 +28,19 @@ enum ExtensionCleanup {
     // MARK: - Private
 
     private static func findExtensionPaths() -> [String] {
-        guard let output = run("/usr/bin/mdfind", arguments: [
-            "kMDItemCFBundleIdentifier == '\(extensionBundleID)'"
+        guard let output = run("/usr/bin/pluginkit", arguments: [
+            "-mDvvv", "-i", extensionBundleID
         ]) else {
             return []
         }
+        // Parse "Path = /some/path" lines from pluginkit verbose output.
         return output
             .components(separatedBy: "\n")
-            .filter { !$0.isEmpty }
+            .compactMap { line -> String? in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard trimmed.hasPrefix("Path = ") else { return nil }
+                return String(trimmed.dropFirst("Path = ".count))
+            }
     }
 
     @discardableResult

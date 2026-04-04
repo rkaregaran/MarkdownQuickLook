@@ -12,9 +12,6 @@ xcodebuild \
   -configuration Debug \
   -destination 'platform=macOS' \
   -derivedDataPath "$ROOT/.derivedData" \
-  CODE_SIGN_IDENTITY="-" \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_ENTITLEMENTS="" \
   build
 
 APP_PATH="$ROOT/.derivedData/Build/Products/Debug/MarkdownQuickLook.app"
@@ -24,6 +21,7 @@ APP_PATH="$ROOT/.derivedData/Build/Products/Debug/MarkdownQuickLook.app"
 open "$APP_PATH"
 
 sleep 2
+pluginkit -e use -i com.rzkr.MarkdownQuickLook.app.preview
 qlmanage -r
 qlmanage -r cache
 
