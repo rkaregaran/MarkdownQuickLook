@@ -118,3 +118,46 @@ targets:
         BUNDLE_LOADER: ""
     dependencies:
       - target: MarkdownRendering
+
+schemes:
+  MarkdownQuickLookApp:
+    build:
+      targets:
+        MarkdownQuickLookApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MarkdownQuickLookAppTests
+    archive:
+      config: AppStore
+
+  MarkdownRenderingTests:
+    build:
+      targets:
+        MarkdownRenderingTests: [test]
+        MarkdownRendering: [test]
+    test:
+      config: Debug
+      targets:
+        - MarkdownRenderingTests
+
+  MarkdownQuickLookPreviewExtensionTests:
+    build:
+      targets:
+        MarkdownQuickLookPreviewExtensionTests: [test]
+        MarkdownRendering: [test]
+    test:
+      config: Debug
+      targets:
+        - MarkdownQuickLookPreviewExtensionTests
+
+  MarkdownQuickLookAppTests:
+    build:
+      targets:
+        MarkdownQuickLookAppTests: [test]
+    test:
+      config: Debug
+      targets:
+        - MarkdownQuickLookAppTests
