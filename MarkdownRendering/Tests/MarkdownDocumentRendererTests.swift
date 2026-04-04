@@ -544,6 +544,26 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(text.contains("not front matter"))
     }
 
+    func testRenderImageFallbackForMissingFile() throws {
+        let payload = try renderDocument("![Screenshot](nonexistent.png)").payload
+        XCTAssertEqual(payload.attributedContent.string, "[Screenshot]")
+    }
+
+    func testRenderImageFallbackForRemoteURL() throws {
+        let payload = try renderDocument("![Logo](https://example.com/logo.png)").payload
+        XCTAssertEqual(payload.attributedContent.string, "[Logo]")
+    }
+
+    func testRenderImageFallbackWithEmptyAlt() throws {
+        let payload = try renderDocument("![](missing.png)").payload
+        XCTAssertEqual(payload.attributedContent.string, "[image]")
+    }
+
+    func testRenderInlineImageSyntaxInParagraphStaysInline() throws {
+        let payload = try renderDocument("Text with ![img](pic.png) inside").payload
+        XCTAssertTrue(payload.attributedContent.string.contains("Text with"))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

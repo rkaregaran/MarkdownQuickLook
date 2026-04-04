@@ -203,6 +203,15 @@ public final class MarkdownDocumentRenderer {
                 continue
             }
 
+            if let img = imageReference(from: lines[index]) {
+                let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+                if trimmed == "![\(img.alt)](\(img.path))" {
+                    blocks.append(.image(alt: img.alt, path: img.path))
+                    index += 1
+                    continue
+                }
+            }
+
             let paragraph = try parseParagraph(from: lines, startingAt: index)
             blocks.append(.paragraph(paragraph.text))
             index = paragraph.nextIndex
@@ -546,6 +555,9 @@ public final class MarkdownDocumentRenderer {
             ], range: NSRange(location: 0, length: rule.length))
             output.append(rule)
 
+        case .image(let alt, let path):
+            appendImage(alt: alt, path: path, baseURL: baseURL, to: output)
+
         case .frontMatter(let text):
             let scale = settings.textSizeLevel.scaleFactor
             let font = NSFont.monospacedSystemFont(ofSize: 11 * scale, weight: .regular)
@@ -719,6 +731,54 @@ public final class MarkdownDocumentRenderer {
         let highlighted = NSMutableAttributedString(string: code, attributes: baseAttributes)
         applySyntaxHighlighting(to: highlighted, language: language, font: font)
         output.append(highlighted)
+    }
+
+    private func appendImage(alt: String, path: String, baseURL: URL, to output: NSMutableAttributedString) {
+        let scale = settings.textSizeLevel.scaleFactor
+        let maxWidth: CGFloat = 500
+
+        let imageURL: URL
+        if path.hasPrefix("/") {
+            imageURL = URL(fileURLWithPath: path)
+        } else if path.hasPrefix("http://") || path.hasPrefix("https://") {
+            appendImageFallback(alt: alt, to: output)
+            return
+        } else {
+            imageURL = baseURL.appendingPathComponent(path)
+        }
+
+        guard let image = NSImage(contentsOf: imageURL) else {
+            appendImageFallback(alt: alt, to: output)
+            return
+        }
+
+        let originalSize = image.size
+        let scaledWidth = min(originalSize.width, maxWidth)
+        let scaleFactor = scaledWidth / originalSize.width
+        let scaledSize = NSSize(width: scaledWidth, height: originalSize.height * scaleFactor)
+
+        let attachment = NSTextAttachment()
+        let cell = NSTextAttachmentCell(imageCell: image)
+        cell.image?.size = scaledSize
+        attachment.attachmentCell = cell
+
+        let imageString = NSMutableAttributedString(attributedString: NSAttributedString(attachment: attachment))
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacing = 10 * scale
+        style.alignment = .center
+        imageString.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: imageString.length))
+        output.append(imageString)
+    }
+
+    private func appendImageFallback(alt: String, to output: NSMutableAttributedString) {
+        let scale = settings.textSizeLevel.scaleFactor
+        let text = alt.isEmpty ? "[image]" : "[\(alt)]"
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: settings.fontFamily.font(ofSize: 13 * scale, weight: .regular),
+            .foregroundColor: NSColor.tertiaryLabelColor,
+            .paragraphStyle: bodyParagraphStyle()
+        ]
+        output.append(NSAttributedString(string: text, attributes: attributes))
     }
 
     private func applySyntaxHighlighting(to attributed: NSMutableAttributedString, language: String?, font: NSFont) {
@@ -1021,6 +1081,19 @@ public final class MarkdownDocumentRenderer {
         orderedListContent(from: line) != nil
     }
 
+    private func imageReference(from line: String) -> (alt: String, path: String)? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("![") else { return nil }
+        guard let closeBracket = trimmed.firstIndex(of: "]"),
+              trimmed[trimmed.index(after: closeBracket)...].hasPrefix("("),
+              let closeParen = trimmed.lastIndex(of: ")"),
+              closeParen == trimmed.index(before: trimmed.endIndex) else { return nil }
+        let alt = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 2)..<closeBracket])
+        let pathStart = trimmed.index(closeBracket, offsetBy: 2)
+        let path = String(trimmed[pathStart..<closeParen])
+        return (alt, path)
+    }
+
     private func isBlockStart(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -1053,6 +1126,11 @@ public final class MarkdownDocumentRenderer {
         }
 
         if isHorizontalRule(line) {
+            return true
+        }
+
+        if imageReference(from: line) != nil,
+           line.trimmingCharacters(in: .whitespaces).hasPrefix("![") {
             return true
         }
 
