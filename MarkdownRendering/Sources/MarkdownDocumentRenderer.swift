@@ -26,6 +26,7 @@ public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError, Sen
 }
 
 enum MarkdownBlock: Sendable {
+    case frontMatter(String)
     case heading(level: Int, text: String)
     case paragraph(String)
     case quote([String])
@@ -33,6 +34,7 @@ enum MarkdownBlock: Sendable {
     case code(language: String?, text: String)
     case table(MarkdownTable)
     case horizontalRule
+    case image(alt: String, path: String)
 }
 
 struct MarkdownTable: Sendable {
@@ -134,6 +136,22 @@ public final class MarkdownDocumentRenderer {
         let lines = normalizedSource.components(separatedBy: .newlines)
         var blocks: [MarkdownBlock] = []
         var index = 0
+
+        // Parse YAML front matter before main loop.
+        if index < lines.count, lines[index].trimmingCharacters(in: .whitespaces) == "---" {
+            var fmLines: [String] = []
+            var cursor = index + 1
+            while cursor < lines.count {
+                let line = lines[cursor]
+                if line.trimmingCharacters(in: .whitespaces) == "---" {
+                    blocks.append(.frontMatter(fmLines.joined(separator: "\n")))
+                    index = cursor + 1
+                    break
+                }
+                fmLines.append(line)
+                cursor += 1
+            }
+        }
 
         while index < lines.count {
             try throwIfCancelled()
@@ -527,6 +545,29 @@ public final class MarkdownDocumentRenderer {
                 .font: NSFont.systemFont(ofSize: 1)
             ], range: NSRange(location: 0, length: rule.length))
             output.append(rule)
+
+        case .frontMatter(let text):
+            let scale = settings.textSizeLevel.scaleFactor
+            let font = NSFont.monospacedSystemFont(ofSize: 11 * scale, weight: .regular)
+
+            let textBlock = RoundedTextBlock()
+            textBlock.backgroundColor = NSColor(white: 0.5, alpha: 0.08)
+            textBlock.setContentWidth(100, type: .percentageValueType)
+            let padding = 8 * scale
+            for edge: NSRectEdge in [.minX, .maxX, .minY, .maxY] {
+                textBlock.setWidth(padding, type: .absoluteValueType, for: .padding, edge: edge)
+            }
+
+            let style = NSMutableParagraphStyle()
+            style.textBlocks = [textBlock]
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: NSColor.tertiaryLabelColor,
+                .paragraphStyle: style
+            ]
+
+            output.append(NSAttributedString(string: text, attributes: attributes))
         }
     }
 

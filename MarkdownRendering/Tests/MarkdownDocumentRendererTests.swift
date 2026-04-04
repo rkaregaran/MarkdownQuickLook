@@ -497,6 +497,53 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertNil(style)
     }
 
+    func testRenderYAMLFrontMatterIsExtracted() throws {
+        let payload = try renderDocument(
+            """
+            ---
+            title: Test
+            date: 2026-01-01
+            ---
+
+            # Heading
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("title: Test"))
+        XCTAssertTrue(text.contains("Heading"))
+    }
+
+    func testRenderFrontMatterUsesMonospacedFont() throws {
+        let payload = try renderDocument(
+            """
+            ---
+            key: value
+            ---
+
+            Body
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let fmRange = (rendered.string as NSString).range(of: "key: value")
+        let font = rendered.attribute(.font, at: fmRange.location, effectiveRange: nil) as? NSFont
+
+        XCTAssertTrue(font?.isFixedPitch == true)
+    }
+
+    func testRenderUnclosedFrontMatterTreatedAsNormalContent() throws {
+        let payload = try renderDocument(
+            """
+            ---
+            not front matter
+            # Heading
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("not front matter"))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
