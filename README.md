@@ -4,6 +4,7 @@
 [![Download Latest Release](https://img.shields.io/badge/download-latest%20release-2ea44f)](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
 [![Latest Release Date](https://img.shields.io/github/release-date/rkaregaran/MarkdownQuickLook)](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/rkaregaran/MarkdownQuickLook)](https://github.com/rkaregaran/MarkdownQuickLook/blob/main/LICENSE)
+[![Privacy Policy](https://img.shields.io/badge/privacy-local--only-brightgreen)](https://github.com/rkaregaran/MarkdownQuickLook/blob/main/PRIVACY.md)
 [![Platform: macOS](https://img.shields.io/badge/platform-macOS-1f6feb)](https://github.com/rkaregaran/MarkdownQuickLook#install)
 
 Markdown Quick Look is a macOS Quick Look app for previewing standard Markdown files in Finder.
