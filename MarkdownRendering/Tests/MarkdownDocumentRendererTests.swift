@@ -33,7 +33,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         XCTAssertEqual(
             payload.attributedContent.string,
-            "│ First quote line second quote line\n\nAfter quote"
+            "First quote line second quote line\n\nAfter quote"
         )
     }
 
@@ -48,7 +48,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         XCTAssertEqual(
             rendered.string,
-            "│ first paragraph\n\n│ second paragraph"
+            "first paragraph\n\nsecond paragraph"
         )
     }
 
@@ -86,26 +86,25 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertGreaterThan(secondParagraphStyle?.firstLineHeadIndent ?? 0, 0)
     }
 
-    func testRenderAppliesHangingIndentToWrappedQuoteParagraphs() throws {
+    func testRenderAppliesTextBlockToQuoteParagraphs() throws {
         let rendered = renderedTextStorage(
             from: try renderDocument(
                 """
-                > This is a long quote paragraph that should wrap in the text view so we can verify the second visual line stays aligned under the quote marker.
+                > This is a quote paragraph that uses a text block for the left border.
                 """
             ).payload.attributedContent,
             width: 190
         )
 
         let nsString = rendered.string as NSString
-        let paragraphRange = nsString.range(of: "This is a long quote paragraph")
+        let paragraphRange = nsString.range(of: "This is a quote paragraph")
 
         XCTAssertNotEqual(paragraphRange.location, NSNotFound)
         let paragraphStyle = rendered.attribute(.paragraphStyle, at: paragraphRange.location, effectiveRange: nil) as? NSParagraphStyle
-        let wrappedLineCount = lineFragmentCount(in: rendered, for: paragraphRange)
+        let foregroundColor = rendered.attribute(.foregroundColor, at: paragraphRange.location, effectiveRange: nil) as? NSColor
 
-        XCTAssertGreaterThan(wrappedLineCount, 1)
-        XCTAssertEqual(paragraphStyle?.firstLineHeadIndent, 24)
-        XCTAssertEqual(paragraphStyle?.headIndent, 24)
+        XCTAssertNotNil(paragraphStyle?.textBlocks.first)
+        XCTAssertEqual(foregroundColor, NSColor.secondaryLabelColor)
     }
 
     func testRenderAppliesHangingIndentToWrappedFirstBulletParagraph() throws {
@@ -156,7 +155,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         )
         XCTAssertEqual(
             crlfPayload.attributedContent.string,
-            "Paragraph one\n\n│ Quote line one quote line two\n\n• Bullet line one bullet continuation\n\nlet value = 1\nlet doubled = value * 2"
+            "Paragraph one\n\nQuote line one quote line two\n\n• Bullet line one bullet continuation\n\nlet value = 1\nlet doubled = value * 2"
         )
     }
 
@@ -181,7 +180,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         let lineFragments = lineFragmentCount(in: rendered, for: codeRange)
 
         XCTAssertEqual(lineFragments, 2)
-        XCTAssertEqual(paragraphStyle?.lineSpacing, 0)
+        XCTAssertEqual(paragraphStyle?.lineSpacing, 2)
         XCTAssertEqual(paragraphStyle?.paragraphSpacing, 0)
         XCTAssertEqual(paragraphStyle?.paragraphSpacingBefore, 0)
     }

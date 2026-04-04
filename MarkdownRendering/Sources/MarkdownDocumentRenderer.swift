@@ -30,7 +30,7 @@ enum MarkdownBlock: Sendable {
     case paragraph(String)
     case quote([String])
     case list([MarkdownListItem])
-    case code(String)
+    case code(language: String?, text: String)
     case table(MarkdownTable)
 }
 
@@ -142,7 +142,7 @@ public final class MarkdownDocumentRenderer {
             }
 
             if let codeBlock = try parseFencedCodeBlock(from: lines, startingAt: index) {
-                blocks.append(.code(codeBlock.text))
+                blocks.append(.code(language: codeBlock.language, text: codeBlock.text))
                 index = codeBlock.nextIndex
                 continue
             }
@@ -179,10 +179,14 @@ public final class MarkdownDocumentRenderer {
         return blocks
     }
 
-    private func parseFencedCodeBlock(from lines: [String], startingAt index: Int) throws -> (text: String, nextIndex: Int)? {
+    private func parseFencedCodeBlock(from lines: [String], startingAt index: Int) throws -> (language: String?, text: String, nextIndex: Int)? {
         guard isFenceLine(lines[index]) else {
             return nil
         }
+
+        let fenceTrimmed = lines[index].trimmingCharacters(in: .whitespaces)
+        let langHint = String(fenceTrimmed.drop { $0 == "`" }.trimmingCharacters(in: .whitespaces))
+        let language = langHint.isEmpty ? nil : langHint.lowercased()
 
         var codeLines: [String] = []
         var cursor = index + 1
@@ -197,7 +201,7 @@ public final class MarkdownDocumentRenderer {
             cursor += 1
         }
 
-        return (codeLines.joined(separator: "\n"), cursor)
+        return (language, codeLines.joined(separator: "\n"), cursor)
     }
 
     private func parseQuoteBlock(from lines: [String], startingAt index: Int) throws -> (paragraphs: [String], nextIndex: Int)? {
@@ -323,6 +327,16 @@ public final class MarkdownDocumentRenderer {
         return (MarkdownTable(headers: headers, rows: rows), cursor)
     }
 
+    private func checkboxBullet(for text: String) -> (bullet: String, text: String) {
+        if text.hasPrefix("[ ] ") {
+            return ("⬜️", String(text.dropFirst(4)))
+        }
+        if text.hasPrefix("[x] ") || text.hasPrefix("[X] ") {
+            return ("✅", String(text.dropFirst(4)))
+        }
+        return ("•", text)
+    }
+
     private func isTableLine(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("|") else { return false }
@@ -385,21 +399,15 @@ public final class MarkdownDocumentRenderer {
             appendInlineMarkdown(text, baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
 
         case .quote(let paragraphs):
-            for (index, paragraph) in paragraphs.enumerated() {
-                if index > 0 {
-                    output.append(NSAttributedString(string: "\n\n"))
-                }
-
-                appendInlineMarkdown("│ \(paragraph)", baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
-            }
+            let text = paragraphs.joined(separator: "\n\n")
+            appendInlineMarkdown(text, baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
 
         case .list(let items):
             for (itemIndex, item) in items.enumerated() {
                 for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
-                    if itemIndex == 0 && paragraphIndex == 0 {
-                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
-                    } else if paragraphIndex == 0 {
-                        appendInlineMarkdown("• \(paragraph)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
+                    if paragraphIndex == 0 {
+                        let (bullet, text) = checkboxBullet(for: paragraph)
+                        appendInlineMarkdown("\(bullet) \(text)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
                     } else {
                         output.append(NSAttributedString(string: "\n\n"))
                         appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: listContinuationParagraphAttributes(), to: output)
@@ -411,8 +419,8 @@ public final class MarkdownDocumentRenderer {
                 }
             }
 
-        case .code(let text):
-            appendCodeBlock(text, to: output)
+        case .code(let language, let text):
+            appendCodeBlock(text, language: language, to: output)
 
         case .table(let table):
             appendTable(table, to: output)
@@ -533,15 +541,164 @@ public final class MarkdownDocumentRenderer {
         }
     }
 
-    private func appendCodeBlock(_ code: String, to output: NSMutableAttributedString) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 13 * settings.textSizeLevel.scaleFactor, weight: .regular),
+    private func appendCodeBlock(_ code: String, language: String?, to output: NSMutableAttributedString) {
+        let scale = settings.textSizeLevel.scaleFactor
+        let padding = 10 * scale
+        let font = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .regular)
+
+        let textBlock = RoundedTextBlock()
+        textBlock.backgroundColor = NSColor(white: 0.5, alpha: 0.12)
+        textBlock.setContentWidth(100, type: .percentageValueType)
+        for edge: NSRectEdge in [.minX, .maxX, .minY, .maxY] {
+            textBlock.setWidth(padding, type: .absoluteValueType, for: .padding, edge: edge)
+        }
+
+        let codeStyle = NSMutableParagraphStyle()
+        codeStyle.textBlocks = [textBlock]
+        codeStyle.lineSpacing = 2 * scale
+
+        let baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
             .foregroundColor: NSColor.labelColor,
-            .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: codeParagraphStyle()
+            .paragraphStyle: codeStyle
         ]
 
-        output.append(NSAttributedString(string: code, attributes: attributes))
+        let highlighted = NSMutableAttributedString(string: code, attributes: baseAttributes)
+        applySyntaxHighlighting(to: highlighted, language: language, font: font)
+        output.append(highlighted)
+    }
+
+    private func applySyntaxHighlighting(to attributed: NSMutableAttributedString, language: String?, font: NSFont) {
+        let code = attributed.string
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        let boldFont = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
+
+        let commentColor = NSColor.secondaryLabelColor
+        let stringColor = NSColor.systemGreen
+        let keywordColor = NSColor.systemPink
+        let numberColor = NSColor.systemBlue
+        let typeColor = NSColor.systemPurple
+
+        // Single-line comments (// or #).
+        let commentPatterns: [String]
+        switch language {
+        case "python", "ruby", "bash", "sh", "zsh", "yaml", "yml":
+            commentPatterns = ["#[^\n]*"]
+        case "html", "xml":
+            commentPatterns = ["<!--[\\s\\S]*?-->"]
+        default:
+            commentPatterns = ["//[^\n]*", "/\\*[\\s\\S]*?\\*/"]
+        }
+
+        // Strings (double and single quoted).
+        let stringPattern = "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'"
+
+        // Numbers.
+        let numberPattern = "\\b\\d+\\.?\\d*\\b"
+
+        // Keywords per language family.
+        let keywords: [String]
+        switch language {
+        case "swift":
+            keywords = ["import", "let", "var", "func", "class", "struct", "enum", "protocol",
+                        "if", "else", "guard", "switch", "case", "default", "for", "while", "repeat",
+                        "return", "throw", "throws", "try", "catch", "in", "where", "as", "is",
+                        "true", "false", "nil", "self", "Self", "super", "init", "deinit",
+                        "public", "private", "internal", "fileprivate", "open", "static", "override",
+                        "async", "await", "some", "any", "typealias", "associatedtype", "extension",
+                        "final", "lazy", "weak", "unowned", "mutating", "nonmutating",
+                        "convenience", "required", "optional", "dynamic", "indirect",
+                        "break", "continue", "fallthrough", "do", "defer", "inout"]
+        case "python":
+            keywords = ["import", "from", "def", "class", "if", "elif", "else", "for", "while",
+                        "return", "yield", "try", "except", "finally", "raise", "with", "as",
+                        "True", "False", "None", "and", "or", "not", "in", "is", "lambda",
+                        "pass", "break", "continue", "global", "nonlocal", "assert", "del",
+                        "async", "await", "self"]
+        case "javascript", "js", "typescript", "ts":
+            keywords = ["import", "export", "from", "let", "const", "var", "function", "class",
+                        "if", "else", "switch", "case", "default", "for", "while", "do",
+                        "return", "throw", "try", "catch", "finally", "new", "delete", "typeof",
+                        "true", "false", "null", "undefined", "this", "super",
+                        "async", "await", "yield", "of", "in", "instanceof",
+                        "break", "continue", "void", "interface", "type", "enum", "extends", "implements"]
+        case "go":
+            keywords = ["package", "import", "func", "type", "struct", "interface", "map",
+                        "if", "else", "switch", "case", "default", "for", "range", "select",
+                        "return", "go", "defer", "chan", "var", "const",
+                        "true", "false", "nil", "break", "continue", "fallthrough"]
+        case "rust":
+            keywords = ["use", "mod", "fn", "let", "mut", "const", "static", "struct", "enum", "trait", "impl",
+                        "if", "else", "match", "for", "while", "loop", "in",
+                        "return", "pub", "self", "Self", "super", "crate",
+                        "true", "false", "as", "ref", "move", "async", "await", "where",
+                        "break", "continue", "unsafe", "dyn", "type"]
+        case "java", "kotlin":
+            keywords = ["import", "package", "class", "interface", "enum", "extends", "implements",
+                        "if", "else", "switch", "case", "default", "for", "while", "do",
+                        "return", "throw", "try", "catch", "finally", "new",
+                        "true", "false", "null", "this", "super", "void",
+                        "public", "private", "protected", "static", "final", "abstract",
+                        "break", "continue", "instanceof", "synchronized", "volatile",
+                        "var", "val", "fun", "when", "object", "companion", "data", "sealed"]
+        case "c", "cpp", "c++", "objc", "objective-c":
+            keywords = ["#include", "#import", "#define", "#ifdef", "#ifndef", "#endif", "#pragma",
+                        "int", "char", "float", "double", "void", "long", "short", "unsigned", "signed",
+                        "if", "else", "switch", "case", "default", "for", "while", "do",
+                        "return", "break", "continue", "goto", "sizeof", "typedef",
+                        "struct", "union", "enum", "class", "namespace", "template", "typename",
+                        "const", "static", "extern", "volatile", "register", "auto",
+                        "true", "false", "NULL", "nullptr", "this",
+                        "public", "private", "protected", "virtual", "override", "final",
+                        "new", "delete", "throw", "try", "catch", "using"]
+        case "bash", "sh", "zsh":
+            keywords = ["if", "then", "else", "elif", "fi", "for", "while", "do", "done",
+                        "case", "esac", "in", "function", "return", "local", "export",
+                        "echo", "exit", "set", "unset", "readonly", "shift", "source",
+                        "true", "false"]
+        default:
+            // Generic: common keywords across languages.
+            keywords = ["if", "else", "for", "while", "return", "function", "class", "import",
+                        "true", "false", "null", "nil", "let", "var", "const", "def", "fn"]
+        }
+
+        // Apply in order: comments and strings first (they take precedence), then keywords and numbers.
+        // Track which ranges are already colored to avoid overlapping.
+        var colored = IndexSet()
+
+        func applyPattern(_ pattern: String, color: NSColor, bold: Bool = false) {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+            for match in regex.matches(in: code, range: fullRange) {
+                let range = match.range
+                guard !colored.contains(integersIn: range.location..<(range.location + range.length)) else { continue }
+                attributed.addAttribute(.foregroundColor, value: color, range: range)
+                if bold {
+                    attributed.addAttribute(.font, value: boldFont, range: range)
+                }
+                colored.insert(integersIn: range.location..<(range.location + range.length))
+            }
+        }
+
+        // Comments first (highest precedence).
+        for pattern in commentPatterns {
+            applyPattern(pattern, color: commentColor)
+        }
+
+        // Strings.
+        applyPattern(stringPattern, color: stringColor)
+
+        // Keywords (whole word match).
+        if !keywords.isEmpty {
+            let escaped = keywords.map { NSRegularExpression.escapedPattern(for: $0) }
+            let keywordPattern = "\\b(" + escaped.joined(separator: "|") + ")\\b"
+            applyPattern(keywordPattern, color: keywordColor, bold: true)
+        }
+
+        // Numbers.
+        applyPattern(numberPattern, color: numberColor)
+
+        // Types (capitalized identifiers — simple heuristic).
+        applyPattern("\\b[A-Z][a-zA-Z0-9]+\\b", color: typeColor)
     }
 
     private func throwIfCancelled() throws {
@@ -570,7 +727,23 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func quoteAttributes() -> [NSAttributedString.Key: Any] {
-        return hangingIndentAttributes(foregroundColor: NSColor.secondaryLabelColor)
+        let scale = settings.textSizeLevel.scaleFactor
+        let padding = 12 * scale
+
+        let textBlock = QuoteBorderTextBlock()
+        textBlock.setContentWidth(100, type: .percentageValueType)
+        textBlock.setWidth(padding, type: .absoluteValueType, for: .padding, edge: .minX)
+        textBlock.setWidth(4, type: .absoluteValueType, for: .padding, edge: .minY)
+        textBlock.setWidth(4, type: .absoluteValueType, for: .padding, edge: .maxY)
+
+        let style = bodyParagraphStyle()
+        style.textBlocks = [textBlock]
+
+        return [
+            .font: settings.fontFamily.font(ofSize: 15 * scale, weight: .regular),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: style
+        ]
     }
 
     private func listContinuationParagraphAttributes() -> [NSAttributedString.Key: Any] {
@@ -717,4 +890,33 @@ public final class MarkdownDocumentRenderer {
         return nil
     }
 
+}
+
+private final class QuoteBorderTextBlock: NSTextBlock {
+    override func drawBackground(
+        withFrame frameRect: NSRect,
+        in controlView: NSView?,
+        characterRange charRange: NSRange,
+        layoutManager: NSLayoutManager
+    ) {
+        NSColor.tertiaryLabelColor.setFill()
+        let barWidth: CGFloat = 3
+        let barRect = NSRect(x: frameRect.minX, y: frameRect.minY, width: barWidth, height: frameRect.height)
+        let path = NSBezierPath(roundedRect: barRect, xRadius: barWidth / 2, yRadius: barWidth / 2)
+        path.fill()
+    }
+}
+
+private final class RoundedTextBlock: NSTextBlock {
+    override func drawBackground(
+        withFrame frameRect: NSRect,
+        in controlView: NSView?,
+        characterRange charRange: NSRange,
+        layoutManager: NSLayoutManager
+    ) {
+        guard let color = backgroundColor else { return }
+        color.setFill()
+        let path = NSBezierPath(roundedRect: frameRect, xRadius: 6, yRadius: 6)
+        path.fill()
+    }
 }
