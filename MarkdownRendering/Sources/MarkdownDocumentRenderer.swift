@@ -603,6 +603,7 @@ public final class MarkdownDocumentRenderer {
         let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
         attributed.addAttributes(baseAttributes, range: NSRange(location: 0, length: attributed.length))
         applyStrikethrough(to: attributed, from: parsed)
+        applyInlineCodeBackground(to: attributed, from: parsed)
         return attributed
     }
 
@@ -611,6 +612,19 @@ public final class MarkdownDocumentRenderer {
             guard let intent = run.inlinePresentationIntent, intent.contains(.strikethrough) else { continue }
             let nsRange = NSRange(run.range, in: source)
             attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+        }
+    }
+
+    private func applyInlineCodeBackground(to attributed: NSMutableAttributedString, from source: AttributedString) {
+        let bgColor = NSColor(white: 0.5, alpha: 0.12)
+        let scale = settings.textSizeLevel.scaleFactor
+        let codeFont = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .regular)
+
+        for run in source.runs {
+            guard let intent = run.inlinePresentationIntent, intent.contains(.code) else { continue }
+            let nsRange = NSRange(run.range, in: source)
+            attributed.addAttribute(.backgroundColor, value: bgColor, range: nsRange)
+            attributed.addAttribute(.font, value: codeFont, range: nsRange)
         }
     }
 
