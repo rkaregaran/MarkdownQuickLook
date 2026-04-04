@@ -19,17 +19,9 @@ xcodegen generate
 rm -rf "$DIST_DIR" "$DERIVED_DATA_PATH"
 mkdir -p "$DIST_DIR"
 
-signing_args=()
-if [[ "${CI:-}" == "true" ]]; then
-  if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
-    signing_args=(
-      CODE_SIGN_IDENTITY="$DEVELOPER_ID_IDENTITY"
-      CODE_SIGN_STYLE=Manual
-      PROVISIONING_PROFILE_SPECIFIER=
-    )
-  else
-    signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
-  fi
+signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
+if [[ "${CI:-}" != "true" ]]; then
+  signing_args=()
 fi
 
 xcodebuild \
@@ -43,6 +35,23 @@ xcodebuild \
   build
 
 ditto "$APP_PATH" "$DIST_APP_PATH"
+
+# Re-sign with Developer ID if available (CI with certificate).
+if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
+  echo "Re-signing with: $DEVELOPER_ID_IDENTITY"
+
+  # Sign the extension first, then the app (inside-out).
+  EXTENSION_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
+  codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
+    --entitlements "$ROOT/MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements" \
+    --options runtime \
+    "$EXTENSION_PATH"
+
+  codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
+    --entitlements "$ROOT/MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements" \
+    --options runtime \
+    "$DIST_APP_PATH"
+fi
 cp "$LICENSE_PATH" "$DIST_LICENSE_PATH"
 
 "$ROOT/Scripts/check-preview-runtime.sh" "$DIST_APP_PATH"
