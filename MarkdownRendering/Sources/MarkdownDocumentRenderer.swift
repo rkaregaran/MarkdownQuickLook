@@ -45,6 +45,7 @@ struct MarkdownTable: Sendable {
 struct MarkdownListItem: Sendable {
     let index: Int?
     let paragraphs: [String]
+    let children: [MarkdownListItem]
 }
 
 public struct MarkdownPreparedDocument: Sendable {
@@ -277,45 +278,113 @@ public final class MarkdownDocumentRenderer {
         return (paragraphs, cursor)
     }
 
-    private func parseListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
-        guard isBulletLine(lines[index]) else {
-            return nil
-        }
+    private func leadingSpaceCount(_ line: String) -> Int {
+        line.prefix { $0 == " " || $0 == "\t" }.count
+    }
 
+    private func parseListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
+        guard isBulletLine(lines[index]) else { return nil }
+
+        let baseIndent = leadingSpaceCount(lines[index])
         var items: [MarkdownListItem] = []
         var cursor = index
 
-        while cursor < lines.count, isBulletLine(lines[cursor]) {
+        while cursor < lines.count {
+            let line = lines[cursor]
+            let lineIndent = leadingSpaceCount(line)
+            guard isBulletLine(line), lineIndent == baseIndent else { break }
+
             try throwIfCancelled()
-            let item = try parseListItem(from: lines, startingAt: cursor)
+            let item = try parseListItemWithChildren(from: lines, startingAt: cursor, baseIndent: baseIndent, ordered: false)
             items.append(item.item)
             cursor = item.nextIndex
         }
 
-        return (items, cursor)
+        return items.isEmpty ? nil : (items, cursor)
     }
 
-    private func parseListItem(from lines: [String], startingAt index: Int) throws -> (item: MarkdownListItem, nextIndex: Int) {
-        let firstLine = bulletContent(from: lines[index]) ?? ""
-        var paragraphs: [String] = []
-        var currentParagraph = firstLine
+    private func parseOrderedListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
+        guard isOrderedListLine(lines[index]) else { return nil }
+
+        let baseIndent = leadingSpaceCount(lines[index])
+        var items: [MarkdownListItem] = []
+        var cursor = index
+        var itemNumber = 1
+
+        while cursor < lines.count {
+            let line = lines[cursor]
+            let lineIndent = leadingSpaceCount(line)
+            guard isOrderedListLine(line), lineIndent == baseIndent else { break }
+
+            try throwIfCancelled()
+            let item = try parseListItemWithChildren(from: lines, startingAt: cursor, baseIndent: baseIndent, ordered: true, number: itemNumber)
+            items.append(item.item)
+            cursor = item.nextIndex
+            itemNumber += 1
+        }
+
+        return items.isEmpty ? nil : (items, cursor)
+    }
+
+    private func parseListItemWithChildren(
+        from lines: [String],
+        startingAt index: Int,
+        baseIndent: Int,
+        ordered: Bool,
+        number: Int? = nil
+    ) throws -> (item: MarkdownListItem, nextIndex: Int) {
+        let firstLine: String
+        if ordered {
+            firstLine = orderedListContent(from: lines[index])?.content ?? ""
+        } else {
+            firstLine = bulletContent(from: lines[index]) ?? ""
+        }
+
+        var paragraphs: [String] = [firstLine]
         var cursor = index + 1
+        var children: [MarkdownListItem] = []
 
         while cursor < lines.count {
             try throwIfCancelled()
             let line = lines[cursor]
 
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if let nextNonBlankIndex = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1),
-                   isContinuationParagraphLine(lines[nextNonBlankIndex]) {
-                    if currentParagraph.isEmpty == false {
-                        paragraphs.append(currentParagraph)
+                if let next = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1) {
+                    let nextIndent = leadingSpaceCount(lines[next])
+                    if nextIndent > baseIndent && (isBulletLine(lines[next]) || isOrderedListLine(lines[next])) {
+                        cursor = next
+                        continue
                     }
-                    currentParagraph = ""
-                    cursor = nextNonBlankIndex
+                    if nextIndent > baseIndent && !isBulletLine(lines[next]) && !isOrderedListLine(lines[next]) && !isBlockStart(lines[next]) {
+                        // Continuation paragraph within the same item
+                        let content = lines[next].trimmingCharacters(in: .whitespaces)
+                        paragraphs.append(content)
+                        cursor = next + 1
+                        continue
+                    }
+                }
+                break
+            }
+
+            let lineIndent = leadingSpaceCount(line)
+
+            if lineIndent > baseIndent && isBulletLine(line) {
+                if let nested = try parseListBlock(from: lines, startingAt: cursor) {
+                    children.append(contentsOf: nested.items)
+                    cursor = nested.nextIndex
                     continue
                 }
+            }
 
+            if lineIndent > baseIndent && isOrderedListLine(line) {
+                if let nested = try parseOrderedListBlock(from: lines, startingAt: cursor) {
+                    children.append(contentsOf: nested.items)
+                    cursor = nested.nextIndex
+                    continue
+                }
+            }
+
+            if isBulletLine(line) || isOrderedListLine(line) {
                 break
             }
 
@@ -323,94 +392,19 @@ public final class MarkdownDocumentRenderer {
                 break
             }
 
-            guard isContinuationParagraphLine(line) else {
-                break
+            if lineIndent > baseIndent {
+                let content = line.trimmingCharacters(in: .whitespaces)
+                let last = paragraphs.count - 1
+                paragraphs[last] = paragraphs[last] + " " + content
+                cursor += 1
+                continue
             }
 
-            let content = line.trimmingCharacters(in: .whitespaces)
-
-            if currentParagraph.isEmpty {
-                currentParagraph = content
-            } else {
-                currentParagraph += " " + content
-            }
-
-            cursor += 1
+            break
         }
 
-        if currentParagraph.isEmpty == false {
-            paragraphs.append(currentParagraph)
-        }
-
-        return (MarkdownListItem(index: nil, paragraphs: paragraphs), cursor)
-    }
-
-    private func parseOrderedListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
-        guard isOrderedListLine(lines[index]) else {
-            return nil
-        }
-
-        var items: [MarkdownListItem] = []
-        var cursor = index
-        var itemNumber = 1
-
-        while cursor < lines.count, isOrderedListLine(lines[cursor]) {
-            try throwIfCancelled()
-            let item = try parseOrderedListItem(from: lines, startingAt: cursor, number: itemNumber)
-            items.append(item.item)
-            cursor = item.nextIndex
-            itemNumber += 1
-        }
-
-        return (items, cursor)
-    }
-
-    private func parseOrderedListItem(from lines: [String], startingAt index: Int, number: Int) throws -> (item: MarkdownListItem, nextIndex: Int) {
-        let content = orderedListContent(from: lines[index])
-        let firstLine = content?.content ?? ""
-        var paragraphs: [String] = []
-        var currentParagraph = firstLine
-        var cursor = index + 1
-
-        while cursor < lines.count {
-            try throwIfCancelled()
-            let line = lines[cursor]
-
-            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if let nextNonBlankIndex = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1),
-                   isContinuationParagraphLine(lines[nextNonBlankIndex]) {
-                    if currentParagraph.isEmpty == false {
-                        paragraphs.append(currentParagraph)
-                    }
-                    currentParagraph = ""
-                    cursor = nextNonBlankIndex
-                    continue
-                }
-                break
-            }
-
-            if isBlockStart(line) || isOrderedListLine(line) {
-                break
-            }
-
-            guard isContinuationParagraphLine(line) else {
-                break
-            }
-
-            let trimmedContent = line.trimmingCharacters(in: .whitespaces)
-            if currentParagraph.isEmpty {
-                currentParagraph = trimmedContent
-            } else {
-                currentParagraph += " " + trimmedContent
-            }
-            cursor += 1
-        }
-
-        if currentParagraph.isEmpty == false {
-            paragraphs.append(currentParagraph)
-        }
-
-        return (MarkdownListItem(index: number, paragraphs: paragraphs), cursor)
+        let itemIndex = ordered ? (number ?? 1) : nil
+        return (MarkdownListItem(index: itemIndex, paragraphs: paragraphs, children: children), cursor)
     }
 
     private func parseTableBlock(from lines: [String], startingAt index: Int) throws -> (table: MarkdownTable, nextIndex: Int)? {
@@ -512,26 +506,7 @@ public final class MarkdownDocumentRenderer {
             appendInlineMarkdown(text, baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
 
         case .list(let items):
-            for (itemIndex, item) in items.enumerated() {
-                for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
-                    if paragraphIndex == 0 {
-                        let (bullet, text): (String, String)
-                        if let number = item.index {
-                            (bullet, text) = ("\(number).", paragraph)
-                        } else {
-                            (bullet, text) = checkboxBullet(for: paragraph)
-                        }
-                        appendInlineMarkdown("\(bullet) \(text)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
-                    } else {
-                        output.append(NSAttributedString(string: "\n\n"))
-                        appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: listContinuationParagraphAttributes(), to: output)
-                    }
-                }
-
-                if itemIndex < items.count - 1 {
-                    output.append(NSAttributedString(string: "\n"))
-                }
-            }
+            appendListItems(items, depth: 0, baseURL: baseURL, to: output)
 
         case .code(let language, let text):
             appendCodeBlock(text, language: language, to: output)
@@ -580,6 +555,41 @@ public final class MarkdownDocumentRenderer {
             ]
 
             output.append(NSAttributedString(string: text, attributes: attributes))
+        }
+    }
+
+    private func appendListItems(_ items: [MarkdownListItem], depth: Int, baseURL: URL, to output: NSMutableAttributedString) {
+        let bullets = ["•", "◦", "▪"]
+
+        for (itemIndex, item) in items.enumerated() {
+            for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
+                if paragraphIndex == 0 {
+                    let (bullet, text): (String, String)
+                    if let number = item.index {
+                        (bullet, text) = ("\(number).", paragraph)
+                    } else {
+                        let (cb, ct) = checkboxBullet(for: paragraph)
+                        if cb == "•" {
+                            (bullet, text) = (bullets[min(depth, bullets.count - 1)], ct)
+                        } else {
+                            (bullet, text) = (cb, ct)
+                        }
+                    }
+                    appendInlineMarkdown("\(bullet) \(text)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor, depth: depth), to: output)
+                } else {
+                    output.append(NSAttributedString(string: "\n\n"))
+                    appendInlineMarkdown(paragraph, baseURL: baseURL, baseAttributes: listContinuationParagraphAttributes(), to: output)
+                }
+            }
+
+            if !item.children.isEmpty {
+                output.append(NSAttributedString(string: "\n"))
+                appendListItems(item.children, depth: depth + 1, baseURL: baseURL, to: output)
+            }
+
+            if itemIndex < items.count - 1 {
+                output.append(NSAttributedString(string: "\n"))
+            }
         }
     }
 
@@ -971,19 +981,24 @@ public final class MarkdownDocumentRenderer {
         return paragraph
     }
 
-    private func hangingIndentParagraphStyle() -> NSMutableParagraphStyle {
-        let paragraph = bodyParagraphStyle()
-        let indent = 24 * settings.textSizeLevel.scaleFactor
-        paragraph.firstLineHeadIndent = indent
-        paragraph.headIndent = indent
-        return paragraph
+    private func hangingIndentAttributes(foregroundColor: NSColor) -> [NSAttributedString.Key: Any] {
+        hangingIndentAttributes(foregroundColor: foregroundColor, depth: 0)
     }
 
-    private func hangingIndentAttributes(foregroundColor: NSColor) -> [NSAttributedString.Key: Any] {
-        [
-            .font: settings.fontFamily.font(ofSize: 15 * settings.textSizeLevel.scaleFactor, weight: .regular),
+    private func hangingIndentAttributes(foregroundColor: NSColor, depth: Int) -> [NSAttributedString.Key: Any] {
+        let scale = settings.textSizeLevel.scaleFactor
+        let baseIndent = 24 * scale
+        let depthIndent = CGFloat(depth) * 20 * scale
+        let totalIndent = baseIndent + depthIndent
+
+        let paragraph = bodyParagraphStyle()
+        paragraph.firstLineHeadIndent = totalIndent
+        paragraph.headIndent = totalIndent
+
+        return [
+            .font: settings.fontFamily.font(ofSize: 15 * scale, weight: .regular),
             .foregroundColor: foregroundColor,
-            .paragraphStyle: hangingIndentParagraphStyle()
+            .paragraphStyle: paragraph
         ]
     }
 

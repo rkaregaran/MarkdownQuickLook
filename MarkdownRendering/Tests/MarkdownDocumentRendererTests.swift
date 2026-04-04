@@ -564,6 +564,54 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(payload.attributedContent.string.contains("Text with"))
     }
 
+    func testRenderNestedBulletList() throws {
+        let payload = try renderDocument(
+            """
+            - Top
+              - Nested
+              - Nested 2
+            - Back to top
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("Top"))
+        XCTAssertTrue(text.contains("Nested"))
+        XCTAssertTrue(text.contains("Back to top"))
+        XCTAssertTrue(text.contains("◦"))
+    }
+
+    func testRenderDeeplyNestedList() throws {
+        let payload = try renderDocument(
+            """
+            - Level 0
+              - Level 1
+                - Level 2
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("•"))
+        XCTAssertTrue(text.contains("◦"))
+        XCTAssertTrue(text.contains("▪"))
+    }
+
+    func testRenderNestedOrderedList() throws {
+        let payload = try renderDocument(
+            """
+            1. First
+               1. Sub-first
+               2. Sub-second
+            2. Second
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("1. First"))
+        XCTAssertTrue(text.contains("1. Sub-first"))
+        XCTAssertTrue(text.contains("2. Second"))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
