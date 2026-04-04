@@ -412,6 +412,39 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(codeFont?.pointSize, 13)
     }
 
+    func testRenderHorizontalRuleWithDashes() throws {
+        let payload = try renderDocument(
+            """
+            Before
+
+            ---
+
+            After
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("Before"))
+        XCTAssertTrue(text.contains("After"))
+        XCTAssertTrue(text.contains("\u{200B}"))
+    }
+
+    func testRenderHorizontalRuleWithAsterisks() throws {
+        let payload = try renderDocument("***").payload
+        XCTAssertTrue(payload.attributedContent.string.contains("\u{200B}"))
+    }
+
+    func testRenderHorizontalRuleWithUnderscores() throws {
+        let payload = try renderDocument("___").payload
+        XCTAssertTrue(payload.attributedContent.string.contains("\u{200B}"))
+    }
+
+    func testRenderDoesNotTreatShortDashLineAsRule() throws {
+        let payload = try renderDocument("--").payload
+        XCTAssertTrue(payload.attributedContent.string.contains("--"))
+        XCTAssertFalse(payload.attributedContent.string.contains("\u{200B}"))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

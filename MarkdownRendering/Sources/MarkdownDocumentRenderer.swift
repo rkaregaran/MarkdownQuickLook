@@ -32,6 +32,7 @@ enum MarkdownBlock: Sendable {
     case list([MarkdownListItem])
     case code(language: String?, text: String)
     case table(MarkdownTable)
+    case horizontalRule
 }
 
 struct MarkdownTable: Sendable {
@@ -149,6 +150,12 @@ public final class MarkdownDocumentRenderer {
 
             if let heading = heading(from: lines[index]) {
                 blocks.append(.heading(level: heading.level, text: heading.text))
+                index += 1
+                continue
+            }
+
+            if isHorizontalRule(lines[index]) {
+                blocks.append(.horizontalRule)
                 index += 1
                 continue
             }
@@ -424,6 +431,22 @@ public final class MarkdownDocumentRenderer {
 
         case .table(let table):
             appendTable(table, to: output)
+
+        case .horizontalRule:
+            let scale = settings.textSizeLevel.scaleFactor
+            let rule = NSMutableAttributedString(string: "\u{200B}")
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacingBefore = 8 * scale
+            style.paragraphSpacing = 8 * scale
+            let textBlock = HorizontalRuleTextBlock()
+            textBlock.setContentWidth(100, type: .percentageValueType)
+            textBlock.setWidth(8 * scale, type: .absoluteValueType, for: .padding, edge: .minY)
+            style.textBlocks = [textBlock]
+            rule.addAttributes([
+                .paragraphStyle: style,
+                .font: NSFont.systemFont(ofSize: 1)
+            ], range: NSRange(location: 0, length: rule.length))
+            output.append(rule)
         }
     }
 
@@ -828,6 +851,14 @@ public final class MarkdownDocumentRenderer {
         bulletContent(from: line) != nil
     }
 
+    private func isHorizontalRule(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 3 else { return false }
+        let stripped = trimmed.replacingOccurrences(of: " ", with: "")
+        guard let char = stripped.first, ["-", "*", "_"].contains(char) else { return false }
+        return stripped.allSatisfy { $0 == char }
+    }
+
     private func isContinuationParagraphLine(_ line: String) -> Bool {
         line.hasPrefix(" ") || line.hasPrefix("\t")
     }
@@ -870,6 +901,10 @@ public final class MarkdownDocumentRenderer {
         }
 
         if isTableLine(line) {
+            return true
+        }
+
+        if isHorizontalRule(line) {
             return true
         }
 
@@ -918,5 +953,18 @@ private final class RoundedTextBlock: NSTextBlock {
         color.setFill()
         let path = NSBezierPath(roundedRect: frameRect, xRadius: 6, yRadius: 6)
         path.fill()
+    }
+}
+
+private final class HorizontalRuleTextBlock: NSTextBlock {
+    override func drawBackground(
+        withFrame frameRect: NSRect,
+        in controlView: NSView?,
+        characterRange charRange: NSRange,
+        layoutManager: NSLayoutManager
+    ) {
+        NSColor.separatorColor.setFill()
+        let lineRect = NSRect(x: frameRect.minX, y: frameRect.midY, width: frameRect.width, height: 1)
+        lineRect.fill()
     }
 }
