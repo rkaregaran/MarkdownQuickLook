@@ -3,7 +3,7 @@ import SwiftUI
 
 struct StatusView: View {
     private let experience = InstallExperience.current()
-    @State private var showSettings = false
+    @StateObject private var settingsStore = MarkdownSettingsStore()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -37,12 +37,7 @@ struct StatusView: View {
 
             Divider()
 
-            DisclosureGroup("Preview Settings", isExpanded: $showSettings) {
-                if showSettings {
-                    SettingsPanel()
-                }
-            }
-            .font(.headline)
+            settingsSection
 
             Button(experience.primaryActionTitle) {
                 NSApp.terminate(nil)
@@ -53,13 +48,12 @@ struct StatusView: View {
         .padding(28)
         .frame(width: 560)
     }
-}
 
-private struct SettingsPanel: View {
-    @StateObject private var settingsStore = MarkdownSettingsStore()
-
-    var body: some View {
+    private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("Preview Settings")
+                .font(.headline)
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text("Aa")
@@ -92,7 +86,6 @@ private struct SettingsPanel: View {
 
             previewSnippet
         }
-        .padding(.top, 4)
     }
 
     private var fontDesign: Font.Design {
