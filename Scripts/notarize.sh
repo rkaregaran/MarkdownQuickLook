@@ -28,9 +28,9 @@ echo "$NOTARY_KEY" > "$KEY_FILE"
 
 echo "Submitting for notarization..."
 xcrun notarytool submit "$ZIP_PATH" \
-  --apple-api-key "$KEY_FILE" \
-  --apple-api-key-id "$NOTARY_KEY_ID" \
-  --apple-api-issuer "$NOTARY_ISSUER_ID" \
+  --key "$KEY_FILE" \
+  --key-id "$NOTARY_KEY_ID" \
+  --issuer "$NOTARY_ISSUER_ID" \
   --wait
 
 # Extract the app for stapling.
