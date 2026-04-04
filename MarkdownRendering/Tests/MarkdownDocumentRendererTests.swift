@@ -612,6 +612,50 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(text.contains("2. Second"))
     }
 
+    func testRenderMermaidCodeBlockHasLabel() throws {
+        let payload = try renderDocument(
+            """
+            ```mermaid
+            graph TD
+              A --> B
+            ```
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("Mermaid Diagram"))
+        XCTAssertTrue(text.contains("graph TD"))
+    }
+
+    func testRenderMathCodeBlockHasLabel() throws {
+        let payload = try renderDocument(
+            """
+            ```latex
+            E = mc^2
+            ```
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertTrue(text.contains("Math Expression"))
+        XCTAssertTrue(text.contains("E = mc^2"))
+    }
+
+    func testRenderRegularCodeBlockHasNoLabel() throws {
+        let payload = try renderDocument(
+            """
+            ```swift
+            let x = 1
+            ```
+            """
+        ).payload
+
+        let text = payload.attributedContent.string
+        XCTAssertFalse(text.contains("Diagram"))
+        XCTAssertFalse(text.contains("Expression"))
+        XCTAssertTrue(text.contains("let x = 1"))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

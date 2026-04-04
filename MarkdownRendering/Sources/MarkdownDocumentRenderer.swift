@@ -738,9 +738,37 @@ public final class MarkdownDocumentRenderer {
             .paragraphStyle: codeStyle
         ]
 
-        let highlighted = NSMutableAttributedString(string: code, attributes: baseAttributes)
-        applySyntaxHighlighting(to: highlighted, language: language, font: font)
+        let content: String
+        if let label = codeBlockLabel(for: language) {
+            content = label + "\n" + code
+        } else {
+            content = code
+        }
+
+        let highlighted = NSMutableAttributedString(string: content, attributes: baseAttributes)
+
+        if let label = codeBlockLabel(for: language) {
+            let labelRange = NSRange(location: 0, length: label.count)
+            highlighted.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 11 * scale, weight: .semibold), range: labelRange)
+            highlighted.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: labelRange)
+            let codeRange = NSRange(location: label.count + 1, length: code.count)
+            let codeString = NSMutableAttributedString(attributedString: highlighted.attributedSubstring(from: codeRange))
+            applySyntaxHighlighting(to: codeString, language: language, font: font)
+            highlighted.replaceCharacters(in: codeRange, with: codeString)
+        } else {
+            applySyntaxHighlighting(to: highlighted, language: language, font: font)
+        }
+
         output.append(highlighted)
+    }
+
+    private func codeBlockLabel(for language: String?) -> String? {
+        switch language {
+        case "mermaid": return "📊 Mermaid Diagram"
+        case "math", "latex", "tex": return "📐 Math Expression"
+        case "diagram": return "📊 Diagram"
+        default: return nil
+        }
     }
 
     private func appendImage(alt: String, path: String, baseURL: URL, to output: NSMutableAttributedString) {
