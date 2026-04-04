@@ -1,6 +1,11 @@
 #!/bin/zsh
 set -euo pipefail
 
+NOTARIZE=false
+if [[ "${1:-}" == "--notarize" ]]; then
+  NOTARIZE=true
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
@@ -22,6 +27,14 @@ mkdir -p "$DIST_DIR"
 signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
 if [[ "${CI:-}" != "true" ]]; then
   signing_args=()
+  if [[ "$NOTARIZE" == "true" && -z "${DEVELOPER_ID_IDENTITY:-}" ]]; then
+    DEVELOPER_ID_IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+    if [[ -z "$DEVELOPER_ID_IDENTITY" ]]; then
+      echo "Error: --notarize requires a Developer ID Application certificate in your keychain"
+      exit 1
+    fi
+    echo "Found: $DEVELOPER_ID_IDENTITY"
+  fi
 fi
 
 xcodebuild \
@@ -62,6 +75,10 @@ ditto "$DIST_APP_PATH" "$ARCHIVE_DIR/$APP_NAME"
 cp "$DIST_LICENSE_PATH" "$ARCHIVE_DIR/LICENSE"
 ditto -c -k --sequesterRsrc "$ARCHIVE_DIR" "$ZIP_PATH"
 rm -rf "$ARCHIVE_DIR"
+
+if [[ "$NOTARIZE" == "true" && -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
+  "$ROOT/Scripts/notarize.sh" "$ZIP_PATH"
+fi
 
 echo "App path: $DIST_APP_PATH"
 echo "License path: $DIST_LICENSE_PATH"

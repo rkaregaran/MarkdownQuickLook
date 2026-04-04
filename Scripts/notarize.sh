@@ -2,7 +2,13 @@
 set -euo pipefail
 
 # Usage: notarize.sh <zip-path>
-# Required env vars: NOTARY_KEY, NOTARY_KEY_ID, NOTARY_ISSUER_ID
+#
+# Credentials (two modes):
+#   1. Keychain profile: store credentials once with
+#      xcrun notarytool store-credentials "MarkdownQuickLook" \
+#        --key <p8-file> --key-id <key-id> --issuer <issuer-id>
+#   2. Env vars: NOTARY_KEY, NOTARY_KEY_ID, NOTARY_ISSUER_ID (used by CI)
+#
 # The zip must contain a single .app at its root.
 
 if [[ $# -ne 1 ]]; then
@@ -12,26 +18,28 @@ fi
 
 ZIP_PATH="$1"
 
-for var in NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER_ID; do
-  if [[ -z "${(P)var:-}" ]]; then
-    echo "Error: $var is not set"
-    exit 1
-  fi
-done
-
 WORK_DIR="$(mktemp -d)"
-KEY_FILE="$WORK_DIR/notary-key.p8"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-# Write the API key to a temp file.
-echo "$NOTARY_KEY" > "$KEY_FILE"
+# Determine credential args: env vars (CI) or keychain profile (local).
+NOTARY_ARGS=()
+if [[ -n "${NOTARY_KEY:-}" && -n "${NOTARY_KEY_ID:-}" && -n "${NOTARY_ISSUER_ID:-}" ]]; then
+  KEY_FILE="$WORK_DIR/notary-key.p8"
+  echo "$NOTARY_KEY" > "$KEY_FILE"
+  NOTARY_ARGS=(--key "$KEY_FILE" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID")
+elif xcrun notarytool history --keychain-profile "MarkdownQuickLook" > /dev/null 2>&1; then
+  NOTARY_ARGS=(--keychain-profile "MarkdownQuickLook")
+else
+  echo "Error: No notarization credentials found."
+  echo "Either set NOTARY_KEY/NOTARY_KEY_ID/NOTARY_ISSUER_ID env vars,"
+  echo "or store credentials with:"
+  echo "  xcrun notarytool store-credentials \"MarkdownQuickLook\" \\"
+  echo "    --key <p8-file> --key-id <key-id> --issuer <issuer-id>"
+  exit 1
+fi
 
 echo "Submitting for notarization..."
-xcrun notarytool submit "$ZIP_PATH" \
-  --key "$KEY_FILE" \
-  --key-id "$NOTARY_KEY_ID" \
-  --issuer "$NOTARY_ISSUER_ID" \
-  --wait
+xcrun notarytool submit "$ZIP_PATH" "${NOTARY_ARGS[@]}" --wait
 
 # Extract the app for stapling.
 STAPLE_DIR="$WORK_DIR/staple"
