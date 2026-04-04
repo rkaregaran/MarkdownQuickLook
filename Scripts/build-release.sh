@@ -25,9 +25,9 @@ xcodebuild \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  CODE_SIGN_IDENTITY="" \
+  CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
   build
 
 ditto "$APP_PATH" "$DIST_APP_PATH"
