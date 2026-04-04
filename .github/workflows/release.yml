@@ -61,8 +61,6 @@ jobs:
 
       - name: Build release artifact
         run: ./Scripts/build-release.sh
-        env:
-          XCODEBUILD_EXTRA_ARGS: "CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="
 
       - name: Derive rolling release metadata
         id: release_meta

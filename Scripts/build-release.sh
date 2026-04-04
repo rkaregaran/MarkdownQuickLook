@@ -19,13 +19,18 @@ xcodegen generate
 rm -rf "$DIST_DIR" "$DERIVED_DATA_PATH"
 mkdir -p "$DIST_DIR"
 
+signing_args=()
+if [[ "${CI:-}" == "true" ]]; then
+  signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
+fi
+
 xcodebuild \
   -project MarkdownQuickLook.xcodeproj \
   -scheme MarkdownQuickLookApp \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  ${XCODEBUILD_EXTRA_ARGS:-} \
+  "${signing_args[@]}" \
   build
 
 ditto "$APP_PATH" "$DIST_APP_PATH"
