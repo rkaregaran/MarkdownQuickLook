@@ -31,6 +31,7 @@ xcodebuild \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   "${signing_args[@]}" \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   build
 
 ditto "$APP_PATH" "$DIST_APP_PATH"

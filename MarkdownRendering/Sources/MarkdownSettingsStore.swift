@@ -22,6 +22,7 @@ public final class MarkdownSettingsStore: ObservableObject {
     }
 
     private static func load(from defaults: UserDefaults) -> MarkdownRenderSettings {
+        defaults.synchronize()
         guard let data = defaults.data(forKey: settingsKey),
               let decoded = try? JSONDecoder().decode(MarkdownRenderSettings.self, from: data)
         else { return .default }
