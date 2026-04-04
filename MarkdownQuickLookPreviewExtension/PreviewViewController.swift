@@ -160,7 +160,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         for document: MarkdownPreparedDocument,
         shouldContinue: @escaping @MainActor @Sendable () -> Bool
     ) async throws -> MarkdownRenderPayload {
-        try await MarkdownDocumentRenderer().render(document: document, shouldContinue: shouldContinue)
+        let settings = MarkdownSettingsStore().settings
+        return try await MarkdownDocumentRenderer(settings: settings).render(document: document, shouldContinue: shouldContinue)
     }
 
     var testingCurrentRootView: PreviewRootView {
