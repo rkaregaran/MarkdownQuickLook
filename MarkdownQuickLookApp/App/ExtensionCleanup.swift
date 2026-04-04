@@ -21,8 +21,9 @@ enum ExtensionCleanup {
             run("/usr/bin/pluginkit", arguments: ["-r", path])
         }
 
-        // Ensure the current copy is registered from its new location.
+        // Ensure the current copy is registered and enabled.
         run("/usr/bin/pluginkit", arguments: ["-a", currentExtensionPath])
+        run("/usr/bin/pluginkit", arguments: ["-e", "use", "-i", extensionBundleID])
     }
 
     // MARK: - Private
