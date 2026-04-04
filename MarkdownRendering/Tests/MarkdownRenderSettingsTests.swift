@@ -71,3 +71,41 @@ final class MarkdownRenderSettingsTests: XCTestCase {
         XCTAssertTrue(bold.fontDescriptor.symbolicTraits.contains(.bold))
     }
 }
+
+final class MarkdownSettingsStoreTests: XCTestCase {
+    private let testSuiteName = "com.test.MarkdownSettingsStoreTests.\(UUID().uuidString)"
+
+    override func tearDown() {
+        if let defaults = UserDefaults(suiteName: testSuiteName) {
+            defaults.removePersistentDomain(forName: testSuiteName)
+        }
+        super.tearDown()
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        UserDefaults(suiteName: testSuiteName)!
+    }
+
+    func testDefaultSettingsWhenNothingStored() {
+        let store = MarkdownSettingsStore(defaults: makeDefaults())
+        XCTAssertEqual(store.settings, .default)
+    }
+
+    func testSettingsPersistAcrossInstances() {
+        let defaults = makeDefaults()
+        let store1 = MarkdownSettingsStore(defaults: defaults)
+        store1.settings = MarkdownRenderSettings(textSizeLevel: .large, fontFamily: .serif)
+
+        let store2 = MarkdownSettingsStore(defaults: defaults)
+        XCTAssertEqual(store2.settings.textSizeLevel, .large)
+        XCTAssertEqual(store2.settings.fontFamily, .serif)
+    }
+
+    func testCorruptedDataFallsBackToDefaults() {
+        let defaults = makeDefaults()
+        defaults.set(Data([0xFF, 0xFE]), forKey: "renderSettings")
+
+        let store = MarkdownSettingsStore(defaults: defaults)
+        XCTAssertEqual(store.settings, .default)
+    }
+}
