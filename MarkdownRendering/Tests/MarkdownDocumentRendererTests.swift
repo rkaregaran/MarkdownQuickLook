@@ -479,6 +479,24 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(payload.attributedContent.string, "123 not a list")
     }
 
+    func testRenderStrikethroughAppliesStrikethroughStyle() throws {
+        let payload = try renderDocument("Hello ~~struck~~ world").payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+        let struckRange = nsString.range(of: "struck")
+
+        XCTAssertNotEqual(struckRange.location, NSNotFound)
+        let style = rendered.attribute(.strikethroughStyle, at: struckRange.location, effectiveRange: nil) as? Int
+        XCTAssertEqual(style, NSUnderlineStyle.single.rawValue)
+    }
+
+    func testRenderNonStrikethroughTextHasNoStrikethroughStyle() throws {
+        let payload = try renderDocument("Hello ~~struck~~ world").payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let style = rendered.attribute(.strikethroughStyle, at: 0, effectiveRange: nil) as? Int
+        XCTAssertNil(style)
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

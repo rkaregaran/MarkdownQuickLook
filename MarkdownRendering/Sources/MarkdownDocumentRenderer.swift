@@ -539,7 +539,16 @@ public final class MarkdownDocumentRenderer {
         let parsed = (try? AttributedString(markdown: text, options: options, baseURL: baseURL)) ?? AttributedString(text)
         let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
         attributed.addAttributes(baseAttributes, range: NSRange(location: 0, length: attributed.length))
+        applyStrikethrough(to: attributed, from: parsed)
         return attributed
+    }
+
+    private func applyStrikethrough(to attributed: NSMutableAttributedString, from source: AttributedString) {
+        for run in source.runs {
+            guard let intent = run.inlinePresentationIntent, intent.contains(.strikethrough) else { continue }
+            let nsRange = NSRange(run.range, in: source)
+            attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+        }
     }
 
     private func appendInlineMarkdown(
