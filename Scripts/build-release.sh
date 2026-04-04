@@ -53,12 +53,20 @@ ditto "$APP_PATH" "$DIST_APP_PATH"
 if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
   echo "Re-signing with: $DEVELOPER_ID_IDENTITY"
 
-  # Sign the extension first, then the app (inside-out).
-  EXTENSION_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
+  # Sign extensions first, then the app (inside-out).
+  PREVIEW_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
   codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
     --entitlements "$ROOT/MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements" \
     --options runtime \
-    "$EXTENSION_PATH"
+    "$PREVIEW_PATH"
+
+  THUMBNAIL_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookThumbnailExtension.appex"
+  if [[ -d "$THUMBNAIL_PATH" ]]; then
+    codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
+      --entitlements "$ROOT/MarkdownQuickLookThumbnailExtension/MarkdownQuickLookThumbnailExtension.entitlements" \
+      --options runtime \
+      "$THUMBNAIL_PATH"
+  fi
 
   codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
     --entitlements "$ROOT/MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements" \

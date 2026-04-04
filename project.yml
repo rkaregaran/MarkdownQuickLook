@@ -35,6 +35,8 @@ targets:
     dependencies:
       - target: MarkdownQuickLookPreviewExtension
         embed: true
+      - target: MarkdownQuickLookThumbnailExtension
+        embed: true
       - target: MarkdownRendering
 
   MarkdownQuickLookPreviewExtension:
@@ -55,6 +57,26 @@ targets:
         ENABLE_APP_SANDBOX: YES
         ENABLE_USER_SELECTED_FILES: readonly
         CODE_SIGN_ENTITLEMENTS: MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements
+    dependencies:
+      - target: MarkdownRendering
+
+  MarkdownQuickLookThumbnailExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: MarkdownQuickLookThumbnailExtension
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app.thumbnail
+        INFOPLIST_FILE: MarkdownQuickLookThumbnailExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_USER_SELECTED_FILES: readonly
+        CODE_SIGN_ENTITLEMENTS: MarkdownQuickLookThumbnailExtension/MarkdownQuickLookThumbnailExtension.entitlements
     dependencies:
       - target: MarkdownRendering
 
