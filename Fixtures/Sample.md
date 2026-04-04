@@ -36,3 +36,16 @@ print(greeting)
 3. Enjoy formatted markdown
 
 This text has ~~strikethrough~~ and **bold** and *italic* formatting.
+
+## Nested Lists
+
+- Fruits
+  - Apples
+  - Bananas
+    - Yellow
+    - Green
+- Vegetables
+
+## Image Test
+
+![App Icon](../MarkdownQuickLookApp/Assets.xcassets/AppIcon.appiconset/icon_1024x1024.png)
