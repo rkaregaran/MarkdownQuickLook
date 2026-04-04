@@ -18,9 +18,11 @@ targets:
         INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements
     dependencies:
       - target: MarkdownQuickLookPreviewExtension
         embed: true
+      - target: MarkdownRendering
 
   MarkdownQuickLookPreviewExtension:
     type: app-extension
@@ -39,6 +41,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ENABLE_APP_SANDBOX: YES
         ENABLE_USER_SELECTED_FILES: readonly
+        CODE_SIGN_ENTITLEMENTS: MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements
     dependencies:
       - target: MarkdownRendering
 
