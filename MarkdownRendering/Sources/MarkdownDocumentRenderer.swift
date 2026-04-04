@@ -44,13 +44,11 @@ public struct MarkdownPreparedDocument: Sendable {
 }
 
 public final class MarkdownDocumentRenderer {
-    private enum LayoutConstants {
-        static let lineSpacing: CGFloat = 4
-        static let paragraphSpacing: CGFloat = 10
-        static let hangingIndent: CGFloat = 24
-    }
+    private let settings: MarkdownRenderSettings
 
-    public init() {}
+    public init(settings: MarkdownRenderSettings = .default) {
+        self.settings = settings
+    }
 
     public func prepareDocument(fileAt url: URL) throws -> MarkdownPreparedDocument {
         try throwIfCancelled()
@@ -396,20 +394,12 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func headingBaseFont(for level: Int) -> NSFont {
-        switch level {
-        case 1:
-            return NSFont.systemFont(ofSize: 30, weight: .semibold)
-        case 2:
-            return NSFont.systemFont(ofSize: 24, weight: .semibold)
-        case 3:
-            return NSFont.systemFont(ofSize: 20, weight: .semibold)
-        default:
-            return NSFont.systemFont(ofSize: 17, weight: .semibold)
-        }
+        settings.fontFamily.font(ofSize: headingSize(for: level), weight: .semibold)
     }
 
     private func headingFont(for baseFont: NSFont, level: Int) -> NSFont {
-        let sizedFont = baseFont.isFixedPitch ? NSFont.monospacedSystemFont(ofSize: headingSize(for: level), weight: .semibold) : NSFont.systemFont(ofSize: headingSize(for: level), weight: .semibold)
+        let size = headingSize(for: level)
+        let sizedFont = baseFont.isFixedPitch ? NSFont.monospacedSystemFont(ofSize: size, weight: .semibold) : settings.fontFamily.font(ofSize: size, weight: .semibold)
         let manager = NSFontManager.shared
         var styledFont = sizedFont
         let traits = baseFont.fontDescriptor.symbolicTraits
@@ -426,21 +416,19 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func headingSize(for level: Int) -> CGFloat {
+        let base: CGFloat
         switch level {
-        case 1:
-            return 30
-        case 2:
-            return 24
-        case 3:
-            return 20
-        default:
-            return 17
+        case 1: base = 30
+        case 2: base = 24
+        case 3: base = 20
+        default: base = 17
         }
+        return base * settings.textSizeLevel.scaleFactor
     }
 
     private func appendCodeBlock(_ code: String, to output: NSMutableAttributedString) {
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
+            .font: NSFont.monospacedSystemFont(ofSize: 13 * settings.textSizeLevel.scaleFactor, weight: .regular),
             .foregroundColor: NSColor.labelColor,
             .backgroundColor: NSColor.textBackgroundColor,
             .paragraphStyle: codeParagraphStyle()
@@ -468,7 +456,7 @@ public final class MarkdownDocumentRenderer {
 
     private func paragraphAttributes() -> [NSAttributedString.Key: Any] {
         return [
-            .font: NSFont.systemFont(ofSize: 15),
+            .font: settings.fontFamily.font(ofSize: 15 * settings.textSizeLevel.scaleFactor, weight: .regular),
             .foregroundColor: NSColor.labelColor,
             .paragraphStyle: bodyParagraphStyle()
         ]
@@ -483,22 +471,24 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func bodyParagraphStyle() -> NSMutableParagraphStyle {
+        let scale = settings.textSizeLevel.scaleFactor
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = LayoutConstants.lineSpacing
-        paragraph.paragraphSpacing = LayoutConstants.paragraphSpacing
+        paragraph.lineSpacing = 4 * scale
+        paragraph.paragraphSpacing = 10 * scale
         return paragraph
     }
 
     private func hangingIndentParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = bodyParagraphStyle()
-        paragraph.firstLineHeadIndent = LayoutConstants.hangingIndent
-        paragraph.headIndent = LayoutConstants.hangingIndent
+        let indent = 24 * settings.textSizeLevel.scaleFactor
+        paragraph.firstLineHeadIndent = indent
+        paragraph.headIndent = indent
         return paragraph
     }
 
     private func hangingIndentAttributes(foregroundColor: NSColor) -> [NSAttributedString.Key: Any] {
         [
-            .font: NSFont.systemFont(ofSize: 15),
+            .font: settings.fontFamily.font(ofSize: 15 * settings.textSizeLevel.scaleFactor, weight: .regular),
             .foregroundColor: foregroundColor,
             .paragraphStyle: hangingIndentParagraphStyle()
         ]

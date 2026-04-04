@@ -340,10 +340,83 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         return url
     }
 
-    private func renderDocument(_ contents: String) throws -> (url: URL, payload: MarkdownRenderPayload) {
+    func testRenderWithLargeTextSizeProducesLargerBodyFont() throws {
+        let largeSettings = MarkdownRenderSettings(textSizeLevel: .large, fontFamily: .system)
+        let payload = try renderDocument("Hello world", settings: largeSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+
+        XCTAssertEqual(font?.pointSize ?? 0, 15 * 1.10, accuracy: 0.01)
+    }
+
+    func testRenderWithExtraSmallTextSizeProducesSmallerBodyFont() throws {
+        let smallSettings = MarkdownRenderSettings(textSizeLevel: .extraSmall, fontFamily: .system)
+        let payload = try renderDocument("Hello world", settings: smallSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+
+        XCTAssertEqual(font?.pointSize ?? 0, 15 * 0.80, accuracy: 0.01)
+    }
+
+    func testRenderWithSerifFontUsesSerifForBody() throws {
+        let serifSettings = MarkdownRenderSettings(textSizeLevel: .medium, fontFamily: .serif)
+        let payload = try renderDocument("Hello world", settings: serifSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+        let systemFont = NSFont.systemFont(ofSize: 15)
+
+        XCTAssertNotEqual(font?.fontName, systemFont.fontName)
+    }
+
+    func testRenderWithMonospacedFontUsesFixedPitchForBody() throws {
+        let monoSettings = MarkdownRenderSettings(textSizeLevel: .medium, fontFamily: .monospaced)
+        let payload = try renderDocument("Hello world", settings: monoSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+
+        XCTAssertTrue(font?.isFixedPitch == true)
+    }
+
+    func testRenderCodeBlockStaysMonospacedRegardlessOfFontFamily() throws {
+        let serifSettings = MarkdownRenderSettings(textSizeLevel: .medium, fontFamily: .serif)
+        let payload = try renderDocument("```\nlet x = 1\n```", settings: serifSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+
+        XCTAssertTrue(font?.isFixedPitch == true)
+    }
+
+    func testRenderHeadingScalesWithTextSizeLevel() throws {
+        let largeSettings = MarkdownRenderSettings(textSizeLevel: .large, fontFamily: .system)
+        let payload = try renderDocument("# Title", settings: largeSettings).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+
+        XCTAssertEqual(font?.pointSize ?? 0, 30 * 1.10, accuracy: 0.01)
+    }
+
+    func testDefaultSettingsProduceSameFontSizesAsBeforeSettingsFeature() throws {
+        let payload = try renderDocument("# Title\n\nBody text\n\n```\ncode\n```").payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+
+        let titleRange = nsString.range(of: "Title")
+        let bodyRange = nsString.range(of: "Body text")
+        let codeRange = nsString.range(of: "code")
+
+        let titleFont = rendered.attribute(.font, at: titleRange.location, effectiveRange: nil) as? NSFont
+        let bodyFont = rendered.attribute(.font, at: bodyRange.location, effectiveRange: nil) as? NSFont
+        let codeFont = rendered.attribute(.font, at: codeRange.location, effectiveRange: nil) as? NSFont
+
+        XCTAssertEqual(titleFont?.pointSize, 30)
+        XCTAssertEqual(bodyFont?.pointSize, 15)
+        XCTAssertEqual(codeFont?.pointSize, 13)
+    }
+
+    private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
-        let payload = try MarkdownDocumentRenderer().render(fileAt: url)
+        let payload = try MarkdownDocumentRenderer(settings: settings).render(fileAt: url)
         return (url, payload)
     }
 
