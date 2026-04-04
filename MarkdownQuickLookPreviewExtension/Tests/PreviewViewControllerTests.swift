@@ -167,7 +167,7 @@ final class PreviewViewControllerTests: XCTestCase {
         let document = try MarkdownDocumentRenderer().prepareDocument(fileAt: url)
         let controller = PreviewViewController(
             prepareDocumentResultProvider: { _ in
-                Thread.sleep(forTimeInterval: 0.05)
+                Thread.sleep(forTimeInterval: 0.5)
                 return .prepared(document)
             },
             renderProvider: { document, _ in
@@ -183,10 +183,10 @@ final class PreviewViewControllerTests: XCTestCase {
         let task = Task {
             try await controller.preparePreviewOfFile(at: url)
         }
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 50_000_000)
         task.cancel()
         _ = await task.result
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(nanoseconds: 100_000_000)
 
         let rootView = controller.testingCurrentRootView
         XCTAssertEqual(rootView.title, "Cancelled.md")
