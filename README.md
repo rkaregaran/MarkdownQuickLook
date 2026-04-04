@@ -25,9 +25,11 @@ It is best effort for regular `.md` files, which means Finder may not always pic
 1. Select a `.md` file in Finder.
 2. Press `Space`.
 
-## Important Caveat
+## Important Caveats
 
 Finder may still prefer Apple's built-in plain-text preview on some macOS versions.
+
+**"Would like to access data from other apps" dialog:** macOS may show this prompt when the app or its Quick Look extension accesses shared settings stored in an App Group container. This is a standard macOS privacy feature — the app stores your preview preferences (text size, font) in a shared container so the Quick Look extension can read them. Clicking "Allow" lets the app save and load these settings. This prompt appears once per session for non-App Store builds; App Store builds suppress it automatically.
 
 ## Development
 
