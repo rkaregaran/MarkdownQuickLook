@@ -292,7 +292,7 @@ import Foundation
 
 public final class MarkdownSettingsStore: ObservableObject {
     private static let settingsKey = "renderSettings"
-    static let suiteName = "group.com.example.MarkdownQuickLook"
+    static let suiteName = "group.com.rzkr.MarkdownQuickLook"
 
     private let defaults: UserDefaults
 
@@ -360,7 +360,7 @@ Create `MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements`:
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.example.MarkdownQuickLook</string>
+		<string>group.com.rzkr.MarkdownQuickLook</string>
 	</array>
 </dict>
 </plist>
@@ -377,7 +377,7 @@ Create `MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.enti
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.example.MarkdownQuickLook</string>
+		<string>group.com.rzkr.MarkdownQuickLook</string>
 	</array>
 </dict>
 </plist>
@@ -399,7 +399,7 @@ Three changes to `project.yml`:
     settings:
       base:
         PRODUCT_NAME: MarkdownQuickLook
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app
         INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
@@ -424,7 +424,7 @@ Three changes to `project.yml`:
           - Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app.preview
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app.preview
         INFOPLIST_FILE: MarkdownQuickLookPreviewExtension/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic

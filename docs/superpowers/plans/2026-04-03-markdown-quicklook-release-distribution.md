@@ -67,7 +67,7 @@ MarkdownQuickLookAppTests:
     - path: MarkdownQuickLookApp/Tests
   settings:
     base:
-      PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.appTests
+      PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.appTests
       GENERATE_INFOPLIST_FILE: YES
       TEST_HOST: ""
       BUNDLE_LOADER: ""

@@ -82,7 +82,7 @@ targets:
       - path: MarkdownQuickLookApp/App
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app
         INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
@@ -100,7 +100,7 @@ targets:
           - Info.plist
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app.preview
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app.preview
         INFOPLIST_FILE: MarkdownQuickLookPreviewExtension/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
@@ -117,7 +117,7 @@ targets:
       - path: MarkdownRendering/Sources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.rendering
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.rendering
         GENERATE_INFOPLIST_FILE: YES
 
   MarkdownRenderingTests:
@@ -128,7 +128,7 @@ targets:
       - path: MarkdownRendering/Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.renderingTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.renderingTests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: ""
         BUNDLE_LOADER: ""

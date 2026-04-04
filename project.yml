@@ -15,12 +15,13 @@ targets:
     settings:
       base:
         PRODUCT_NAME: MarkdownQuickLook
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app
         INFOPLIST_FILE: MarkdownQuickLookApp/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: ENABLE_EXTENSION_CLEANUP
     dependencies:
       - target: MarkdownQuickLookPreviewExtension
         embed: true
@@ -37,7 +38,7 @@ targets:
           - Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.app.preview
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.app.preview
         INFOPLIST_FILE: MarkdownQuickLookPreviewExtension/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Automatic
@@ -56,7 +57,7 @@ targets:
       - path: MarkdownQuickLookApp/Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.appTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.appTests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: ""
         BUNDLE_LOADER: ""
@@ -69,7 +70,7 @@ targets:
       - path: MarkdownRendering/Sources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.rendering
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.rendering
         GENERATE_INFOPLIST_FILE: YES
 
   MarkdownRenderingTests:
@@ -80,7 +81,7 @@ targets:
       - path: MarkdownRendering/Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.renderingTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.renderingTests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: ""
         BUNDLE_LOADER: ""
@@ -101,7 +102,7 @@ targets:
       - path: MarkdownQuickLookPreviewExtension/PreviewRequestTracker.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.MarkdownQuickLook.previewExtensionTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.rzkr.MarkdownQuickLook.previewExtensionTests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: ""
         BUNDLE_LOADER: ""

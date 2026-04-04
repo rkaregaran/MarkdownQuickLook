@@ -42,12 +42,12 @@ The struct:
 
 ### Shared Preferences (App Group)
 
-**App group identifier:** `group.com.example.MarkdownQuickLook`
+**App group identifier:** `group.com.rzkr.MarkdownQuickLook`
 
 Added as an entitlement to both the host app (`MarkdownQuickLookApp`) and the extension (`MarkdownQuickLookPreviewExtension`) in `project.yml`.
 
 **`MarkdownSettingsStore`** class in `MarkdownRendering` framework:
-- Reads/writes `MarkdownRenderSettings` to `UserDefaults(suiteName: "group.com.example.MarkdownQuickLook")`
+- Reads/writes `MarkdownRenderSettings` to `UserDefaults(suiteName: "group.com.rzkr.MarkdownQuickLook")`
 - Stores as a single JSON-encoded blob under key `"renderSettings"`
 - Returns `MarkdownRenderSettings.default` if nothing stored or decoding fails
 - Conforms to `ObservableObject` with `@Published var settings` for SwiftUI binding in host app

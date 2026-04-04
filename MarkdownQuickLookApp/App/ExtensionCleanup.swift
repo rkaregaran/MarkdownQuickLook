@@ -1,8 +1,9 @@
+#if ENABLE_EXTENSION_CLEANUP
 import Foundation
 
 enum ExtensionCleanup {
 
-    private static let extensionBundleID = "com.example.MarkdownQuickLook.app.preview"
+    private static let extensionBundleID = "com.rzkr.MarkdownQuickLook.app.preview"
     private static let extensionName = "MarkdownQuickLookPreviewExtension.appex"
 
     /// Finds all registered copies of our Quick Look extension on disk and
@@ -60,3 +61,4 @@ enum ExtensionCleanup {
         return String(data: data, encoding: .utf8)
     }
 }
+#endif

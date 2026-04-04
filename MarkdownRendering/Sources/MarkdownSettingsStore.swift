@@ -3,7 +3,7 @@ import Foundation
 
 public final class MarkdownSettingsStore: ObservableObject {
     static let settingsKey = "renderSettings"
-    static let suiteName = "group.com.example.MarkdownQuickLook"
+    static let suiteName = "group.com.rzkr.MarkdownQuickLook"
 
     private let defaults: UserDefaults
 

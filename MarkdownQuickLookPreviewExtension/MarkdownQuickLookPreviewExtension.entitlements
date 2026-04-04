@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.example.MarkdownQuickLook</string>
+		<string>group.com.rzkr.MarkdownQuickLook</string>
 	</array>
 </dict>
 </plist>
