@@ -15,14 +15,10 @@ It is best effort for regular `.md` files, which means Finder may not always pic
 
 [Download latest release](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
 
-**Important:** macOS will block this app because it is unsigned and may tell you to move it to Trash. After you try to open `MarkdownQuickLook.app` once, open `System Settings` > `Privacy & Security`, explicitly allow the app there, and then open it again from `/Applications`.
-
 1. Download `MarkdownQuickLook-macOS.zip` from GitHub Releases.
 2. Unzip it.
 3. Drag `MarkdownQuickLook.app` into `/Applications`.
-4. Try to open `MarkdownQuickLook.app` once from `/Applications`.
-5. If macOS blocks it or tells you to move it to Trash, open `System Settings` > `Privacy & Security` and explicitly allow `MarkdownQuickLook.app`.
-6. Open `MarkdownQuickLook.app` again from `/Applications`, then click `Close App`. You should not need to open it again after that first successful launch.
+4. Open `MarkdownQuickLook.app` once, then click `Close App`. You should not need to open it again after that first successful launch.
 
 ## Use
 
@@ -90,3 +86,24 @@ You need two certificates from your Apple Developer account:
 7. Upload the `.certSigningRequest` file and download the resulting `.cer` file.
 8. Double-click the `.cer` file to install it into Keychain Access.
 9. Verify: `security find-identity -v -p codesigning | grep "Developer ID Application"`
+
+### Creating an App Store Connect API Key
+
+1. Go to https://appstoreconnect.apple.com/access/integrations/api.
+2. Click **Generate API Key** (or **+**).
+3. Name: `MarkdownQuickLook CI`, Access: **Developer**.
+4. Click Generate and **download the `.p8` file immediately** (one-time download).
+5. Note the **Key ID** and the **Issuer ID** at the top of the page.
+
+### CI Secrets for Notarized Releases
+
+Add these secrets at your repository's Settings > Secrets and variables > Actions:
+
+| Secret | Value |
+|---|---|
+| `DEVELOPER_ID_CERT_BASE64` | `.p12` export of Developer ID Application certificate, base64-encoded (`base64 -i cert.p12 \| pbcopy`) |
+| `DEVELOPER_ID_CERT_PASSWORD` | Password used when exporting the `.p12` |
+| `NOTARY_KEY` | Full contents of the `.p8` API key file |
+| `NOTARY_KEY_ID` | Key ID from App Store Connect |
+| `NOTARY_ISSUER_ID` | Issuer ID from App Store Connect |
+| `KEYCHAIN_PASSWORD` | Any random string (e.g., `openssl rand -base64 24`) |
