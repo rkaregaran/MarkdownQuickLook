@@ -41,6 +41,7 @@ struct MarkdownTable: Sendable {
 }
 
 struct MarkdownListItem: Sendable {
+    let index: Int?
     let paragraphs: [String]
 }
 
@@ -169,6 +170,12 @@ public final class MarkdownDocumentRenderer {
             if let list = try parseListBlock(from: lines, startingAt: index) {
                 blocks.append(.list(list.items))
                 index = list.nextIndex
+                continue
+            }
+
+            if let orderedList = try parseOrderedListBlock(from: lines, startingAt: index) {
+                blocks.append(.list(orderedList.items))
+                index = orderedList.nextIndex
                 continue
             }
 
@@ -308,7 +315,75 @@ public final class MarkdownDocumentRenderer {
             paragraphs.append(currentParagraph)
         }
 
-        return (MarkdownListItem(paragraphs: paragraphs), cursor)
+        return (MarkdownListItem(index: nil, paragraphs: paragraphs), cursor)
+    }
+
+    private func parseOrderedListBlock(from lines: [String], startingAt index: Int) throws -> (items: [MarkdownListItem], nextIndex: Int)? {
+        guard isOrderedListLine(lines[index]) else {
+            return nil
+        }
+
+        var items: [MarkdownListItem] = []
+        var cursor = index
+        var itemNumber = 1
+
+        while cursor < lines.count, isOrderedListLine(lines[cursor]) {
+            try throwIfCancelled()
+            let item = try parseOrderedListItem(from: lines, startingAt: cursor, number: itemNumber)
+            items.append(item.item)
+            cursor = item.nextIndex
+            itemNumber += 1
+        }
+
+        return (items, cursor)
+    }
+
+    private func parseOrderedListItem(from lines: [String], startingAt index: Int, number: Int) throws -> (item: MarkdownListItem, nextIndex: Int) {
+        let content = orderedListContent(from: lines[index])
+        let firstLine = content?.content ?? ""
+        var paragraphs: [String] = []
+        var currentParagraph = firstLine
+        var cursor = index + 1
+
+        while cursor < lines.count {
+            try throwIfCancelled()
+            let line = lines[cursor]
+
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let nextNonBlankIndex = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1),
+                   isContinuationParagraphLine(lines[nextNonBlankIndex]) {
+                    if currentParagraph.isEmpty == false {
+                        paragraphs.append(currentParagraph)
+                    }
+                    currentParagraph = ""
+                    cursor = nextNonBlankIndex
+                    continue
+                }
+                break
+            }
+
+            if isBlockStart(line) || isOrderedListLine(line) {
+                break
+            }
+
+            guard isContinuationParagraphLine(line) else {
+                break
+            }
+
+            let trimmedContent = line.trimmingCharacters(in: .whitespaces)
+            if currentParagraph.isEmpty {
+                currentParagraph = trimmedContent
+            } else {
+                currentParagraph += " " + trimmedContent
+            }
+            cursor += 1
+        }
+
+        if currentParagraph.isEmpty == false {
+            paragraphs.append(currentParagraph)
+        }
+
+        return (MarkdownListItem(index: number, paragraphs: paragraphs), cursor)
     }
 
     private func parseTableBlock(from lines: [String], startingAt index: Int) throws -> (table: MarkdownTable, nextIndex: Int)? {
@@ -413,7 +488,12 @@ public final class MarkdownDocumentRenderer {
             for (itemIndex, item) in items.enumerated() {
                 for (paragraphIndex, paragraph) in item.paragraphs.enumerated() {
                     if paragraphIndex == 0 {
-                        let (bullet, text) = checkboxBullet(for: paragraph)
+                        let (bullet, text): (String, String)
+                        if let number = item.index {
+                            (bullet, text) = ("\(number).", paragraph)
+                        } else {
+                            (bullet, text) = checkboxBullet(for: paragraph)
+                        }
                         appendInlineMarkdown("\(bullet) \(text)", baseURL: baseURL, baseAttributes: hangingIndentAttributes(foregroundColor: NSColor.labelColor), to: output)
                     } else {
                         output.append(NSAttributedString(string: "\n\n"))
@@ -877,6 +957,20 @@ public final class MarkdownDocumentRenderer {
         return nil
     }
 
+    private func orderedListContent(from line: String) -> (index: Int, content: String)? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard let dotIndex = trimmed.firstIndex(of: ".") else { return nil }
+        let numberPart = trimmed[trimmed.startIndex..<dotIndex]
+        guard let number = Int(numberPart), number >= 0 else { return nil }
+        let afterDot = trimmed[trimmed.index(after: dotIndex)...]
+        guard afterDot.hasPrefix(" ") else { return nil }
+        return (number, String(afterDot.dropFirst()))
+    }
+
+    private func isOrderedListLine(_ line: String) -> Bool {
+        orderedListContent(from: line) != nil
+    }
+
     private func isBlockStart(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -897,6 +991,10 @@ public final class MarkdownDocumentRenderer {
         }
 
         if isBulletLine(line) {
+            return true
+        }
+
+        if isOrderedListLine(line) {
             return true
         }
 

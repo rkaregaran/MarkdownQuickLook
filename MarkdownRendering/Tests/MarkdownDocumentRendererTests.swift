@@ -445,6 +445,40 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertFalse(payload.attributedContent.string.contains("\u{200B}"))
     }
 
+    func testRenderOrderedList() throws {
+        let payload = try renderDocument(
+            """
+            1. First item
+            2. Second item
+            3. Third item
+            """
+        ).payload
+
+        XCTAssertEqual(
+            payload.attributedContent.string,
+            "1. First item\n2. Second item\n3. Third item"
+        )
+    }
+
+    func testRenderOrderedListRenumbersSequentially() throws {
+        let payload = try renderDocument(
+            """
+            5. Actually first
+            10. Actually second
+            """
+        ).payload
+
+        XCTAssertEqual(
+            payload.attributedContent.string,
+            "1. Actually first\n2. Actually second"
+        )
+    }
+
+    func testRenderDoesNotTreatNumberWithoutDotAsOrderedList() throws {
+        let payload = try renderDocument("123 not a list").payload
+        XCTAssertEqual(payload.attributedContent.string, "123 not a list")
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
