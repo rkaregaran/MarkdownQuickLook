@@ -24,6 +24,8 @@ if [[ "${CI:-}" == "true" ]]; then
   if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
     signing_args=(
       CODE_SIGN_IDENTITY="$DEVELOPER_ID_IDENTITY"
+      CODE_SIGN_STYLE=Manual
+      PROVISIONING_PROFILE_SPECIFIER=
     )
   else
     signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
