@@ -35,6 +35,14 @@ struct StatusView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
+            Button("Open Extensions Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.link)
+            .font(.footnote)
+
             Divider()
 
             settingsSection

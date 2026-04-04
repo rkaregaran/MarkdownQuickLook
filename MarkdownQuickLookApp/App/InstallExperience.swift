@@ -19,13 +19,16 @@ struct InstallExperience: Equatable {
         for bundleURL: URL = Bundle.main.bundleURL,
         homeDirectoryPath: String = NSHomeDirectory()
     ) -> InstallExperience {
-        if isInstalledInApplicationsFolder(bundleURL, homeDirectoryPath: homeDirectoryPath) {
+        let receiptPath = Bundle.main.bundleURL.appendingPathComponent("Contents/_MASReceipt/receipt").path
+        let isAppStore = FileManager.default.fileExists(atPath: receiptPath)
+
+        if isAppStore || isInstalledInApplicationsFolder(bundleURL, homeDirectoryPath: homeDirectoryPath) {
             return InstallExperience(
                 state: .installed,
                 headline: "Markdown preview is installed.",
-                bodyText: "MarkdownQuickLook has registered its Quick Look extension from /Applications. This first launch is the only launch it needs.",
+                bodyText: "The Quick Look extension is ready. This first launch is the only launch it needs.",
                 reassuranceText: "You can close this app now. You do not need to keep it open for Finder previews.",
-                caveatText: "Standard .md preview remains best-effort. Some macOS versions may still prefer Apple's built-in plain-text preview.",
+                caveatText: "If previews don't appear, go to System Settings > General > Login Items & Extensions > Quick Look and make sure Markdown Quick Look Preview is enabled.",
                 primaryActionTitle: "Close App",
                 stepsTitle: "How to use it",
                 usageSteps: [
@@ -40,13 +43,13 @@ struct InstallExperience: Equatable {
             headline: "Move the app to /Applications first.",
             bodyText: "MarkdownQuickLook should be moved to /Applications before its first real launch so Finder registers the Quick Look extension from its permanent location.",
             reassuranceText: "After moving it, open it once, then click Close App. You will not need to open it again for normal Finder previews.",
-            caveatText: "Standard .md preview remains best-effort. Some macOS versions may still prefer Apple's built-in plain-text preview.",
+            caveatText: "If previews don't appear, go to System Settings > General > Login Items & Extensions > Quick Look and make sure Markdown Quick Look Preview is enabled.",
             primaryActionTitle: "Close App",
             stepsTitle: "Finish setup",
             usageSteps: [
                 "Drag MarkdownQuickLook.app into /Applications.",
-                "Control-click it and choose Open.",
-                "After that first launch, click Close App."
+                "Open it once from /Applications.",
+                "Click Close App."
             ]
         )
     }

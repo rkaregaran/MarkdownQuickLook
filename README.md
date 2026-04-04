@@ -18,12 +18,23 @@ It is best effort for regular `.md` files, which means Finder may not always pic
 
 ## Install
 
+### Mac App Store
+
+1. Install from the [Mac App Store](https://apps.apple.com/app/markdown-quick-look/id0000000000).
+2. Open the app once, then click `Close App`.
+
+### GitHub Release (free, open source)
+
 [Download latest release](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
 
 1. Download `MarkdownQuickLook-macOS.zip` from GitHub Releases.
 2. Unzip it.
 3. Drag `MarkdownQuickLook.app` into `/Applications`.
-4. Open `MarkdownQuickLook.app` once, then click `Close App`. You should not need to open it again after that first successful launch.
+4. Open `MarkdownQuickLook.app` once, then click `Close App`.
+
+### Troubleshooting
+
+If Markdown previews don't appear after installing, go to **System Settings > General > Login Items & Extensions > Quick Look** and make sure **Markdown Quick Look Preview** is enabled.
 
 ## Use
 
