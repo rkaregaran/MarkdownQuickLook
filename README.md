@@ -12,6 +12,10 @@ It requires macOS 14.0 or newer.
 
 It is best effort for regular `.md` files, which means Finder may not always pick it over the built-in plain-text preview.
 
+![MarkdownQuickLook app showing installed status and preview settings](Screenshots/app-installed.png)
+
+![Quick Look preview of a Markdown file in Finder](Screenshots/quick-look-preview.png)
+
 ## Install
 
 [Download latest release](https://github.com/rkaregaran/MarkdownQuickLook/releases/latest)
