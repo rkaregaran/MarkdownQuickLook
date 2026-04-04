@@ -103,7 +103,7 @@ final class MarkdownSettingsStoreTests: XCTestCase {
 
     func testCorruptedDataFallsBackToDefaults() {
         let defaults = makeDefaults()
-        defaults.set(Data([0xFF, 0xFE]), forKey: "renderSettings")
+        defaults.set(Data([0xFF, 0xFE]), forKey: MarkdownSettingsStore.settingsKey)
 
         let store = MarkdownSettingsStore(defaults: defaults)
         XCTAssertEqual(store.settings, .default)
