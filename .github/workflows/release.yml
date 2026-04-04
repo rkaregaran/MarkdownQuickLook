@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  test:
     runs-on: macos-26
 
     steps:
@@ -59,8 +59,62 @@ jobs:
       - name: Run MarkdownQuickLookAppTests
         run: xcodebuild test -project MarkdownQuickLook.xcodeproj -scheme MarkdownQuickLookAppTests -destination 'platform=macOS' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=
 
+  release:
+    needs: test
+    runs-on: macos-26
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Set up signing keychain
+        if: ${{ env.DEVELOPER_ID_CERT_BASE64 != '' }}
+        env:
+          DEVELOPER_ID_CERT_BASE64: ${{ secrets.DEVELOPER_ID_CERT_BASE64 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/developer_id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+
+          echo "$DEVELOPER_ID_CERT_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$DEVELOPER_ID_CERT_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+          echo "DEVELOPER_ID_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
       - name: Build release artifact
+        env:
+          DEVELOPER_ID_IDENTITY: ${{ env.DEVELOPER_ID_IDENTITY }}
         run: ./Scripts/build-release.sh
+
+      - name: Notarize
+        if: ${{ env.DEVELOPER_ID_IDENTITY != '' }}
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: ./Scripts/notarize.sh dist/MarkdownQuickLook-macOS.zip
 
       - name: Derive rolling release metadata
         id: release_meta
@@ -99,3 +153,11 @@ jobs:
             --title "${RELEASE_TITLE}" \
             --notes-file release-notes.txt \
             --target "${GITHUB_SHA}"
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          if [[ -f "$KEYCHAIN_PATH" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
