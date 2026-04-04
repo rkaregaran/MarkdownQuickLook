@@ -69,3 +69,24 @@ Local release packaging is still available with:
 ```bash
 ./Scripts/build-release.sh
 ```
+
+## Notarization & App Store Distribution
+
+### Prerequisites
+
+You need two certificates from your Apple Developer account:
+
+- **Developer ID Application** — for notarized GitHub releases (direct distribution)
+- **Apple Distribution** — for Mac App Store submission
+
+### Creating a Developer ID Application Certificate
+
+1. Open **Keychain Access** (Spotlight > "Keychain Access").
+2. Menu: **Keychain Access > Certificate Assistant > Request a Certificate From a Certificate Authority**.
+3. Fill in your email address, leave CA Email blank.
+4. Select **"Saved to disk"** and save the `.certSigningRequest` file.
+5. Go to https://developer.apple.com/account/resources/certificates/list.
+6. Click **+**, select **Developer ID Application** under Software, click Continue.
+7. Upload the `.certSigningRequest` file and download the resulting `.cer` file.
+8. Double-click the `.cer` file to install it into Keychain Access.
+9. Verify: `security find-identity -v -p codesigning | grep "Developer ID Application"`
