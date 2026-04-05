@@ -603,6 +603,7 @@ public final class MarkdownDocumentRenderer {
         let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
         attributed.addAttributes(baseAttributes, range: NSRange(location: 0, length: attributed.length))
         applyStrikethrough(to: attributed, from: parsed)
+        applyDashes(to: attributed, from: parsed)
         applyInlineCodeBackground(to: attributed, from: parsed)
         return attributed
     }
@@ -612,6 +613,49 @@ public final class MarkdownDocumentRenderer {
             guard let intent = run.inlinePresentationIntent, intent.contains(.strikethrough) else { continue }
             let nsRange = NSRange(run.range, in: source)
             attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+        }
+    }
+
+    private func applyDashes(to attributed: NSMutableAttributedString, from source: AttributedString) {
+        // Build a set of code ranges to skip.
+        var codeRanges = IndexSet()
+        for run in source.runs {
+            if let intent = run.inlinePresentationIntent, intent.contains(.code) {
+                let nsRange = NSRange(run.range, in: source)
+                codeRanges.insert(integersIn: nsRange.location..<(nsRange.location + nsRange.length))
+            }
+        }
+
+        // Replace --- with em dash first (longer match first), then -- with en dash.
+        let replacements: [(pattern: String, replacement: String)] = [
+            ("---", "\u{2014}"),
+            ("--", "\u{2013}")
+        ]
+
+        for (pattern, replacement) in replacements {
+            var searchRange = NSRange(location: 0, length: attributed.length)
+            while searchRange.location < attributed.length {
+                let range = (attributed.string as NSString).range(of: pattern, range: searchRange)
+                guard range.location != NSNotFound else { break }
+
+                if !codeRanges.contains(integersIn: range.location..<(range.location + range.length)) {
+                    attributed.replaceCharacters(in: range, with: replacement)
+                    // Adjust code ranges after replacement.
+                    let delta = replacement.count - range.length
+                    var adjusted = IndexSet()
+                    for r in codeRanges.rangeView {
+                        if r.lowerBound > range.location {
+                            adjusted.insert(integersIn: (r.lowerBound + delta)..<(r.upperBound + delta))
+                        } else {
+                            adjusted.insert(integersIn: r)
+                        }
+                    }
+                    codeRanges = adjusted
+                    searchRange = NSRange(location: range.location + replacement.count, length: attributed.length - range.location - replacement.count)
+                } else {
+                    searchRange = NSRange(location: range.location + range.length, length: attributed.length - range.location - range.length)
+                }
+            }
         }
     }
 

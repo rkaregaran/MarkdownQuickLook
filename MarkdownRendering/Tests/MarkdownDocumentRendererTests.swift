@@ -441,7 +441,8 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
     func testRenderDoesNotTreatShortDashLineAsRule() throws {
         let payload = try renderDocument("--").payload
-        XCTAssertTrue(payload.attributedContent.string.contains("--"))
+        // -- is converted to en dash (–), not a horizontal rule.
+        XCTAssertTrue(payload.attributedContent.string.contains("\u{2013}"))
         XCTAssertFalse(payload.attributedContent.string.contains("\u{200B}"))
     }
 
