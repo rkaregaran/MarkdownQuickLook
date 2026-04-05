@@ -731,46 +731,59 @@ public final class MarkdownDocumentRenderer {
 
     private func appendTable(_ table: MarkdownTable, to output: NSMutableAttributedString) {
         let scale = settings.textSizeLevel.scaleFactor
-        let font = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .regular)
-        let boldFont = NSFont.monospacedSystemFont(ofSize: 13 * scale, weight: .semibold)
+        let font = settings.fontFamily.font(ofSize: 13 * scale, weight: .regular)
+        let boldFont = settings.fontFamily.font(ofSize: 13 * scale, weight: .semibold)
+        let columnCount = table.headers.count
+        let borderColor = NSColor.separatorColor
+        let headerBg = NSColor(white: 0.5, alpha: 0.1)
+        let cellPadding: CGFloat = 6 * scale
 
-        // Calculate column widths.
-        var widths = table.headers.map { $0.count }
-        for row in table.rows {
-            for (col, cell) in row.enumerated() where col < widths.count {
-                widths[col] = max(widths[col], cell.count)
+        let textTable = NSTextTable()
+        textTable.numberOfColumns = columnCount
+        textTable.setContentWidth(100, type: .percentageValueType)
+        textTable.hidesEmptyCells = false
+
+        func cellBlock(row: Int, col: Int, isHeader: Bool) -> NSTextTableBlock {
+            let block = NSTextTableBlock(table: textTable, startingRow: row, rowSpan: 1, startingColumn: col, columnSpan: 1)
+
+            if isHeader {
+                block.backgroundColor = headerBg
             }
+
+            for edge: NSRectEdge in [.minX, .maxX, .minY, .maxY] {
+                block.setWidth(cellPadding, type: .absoluteValueType, for: .padding, edge: edge)
+                block.setWidth(0.5, type: .absoluteValueType, for: .border, edge: edge)
+                block.setBorderColor(borderColor, for: edge)
+            }
+
+            return block
         }
 
-        let baseAttrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.labelColor,
-            .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: codeParagraphStyle()
-        ]
-        let headerAttrs: [NSAttributedString.Key: Any] = [
-            .font: boldFont,
-            .foregroundColor: NSColor.labelColor,
-            .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: codeParagraphStyle()
-        ]
+        func cellString(_ text: String, row: Int, col: Int, isHeader: Bool) -> NSAttributedString {
+            let block = cellBlock(row: row, col: col, isHeader: isHeader)
+            let style = NSMutableParagraphStyle()
+            style.textBlocks = [block]
 
-        func padded(_ cells: [String]) -> String {
-            cells.enumerated().map { i, cell in
-                cell.padding(toLength: widths[i], withPad: " ", startingAt: 0)
-            }.joined(separator: "  │  ")
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: isHeader ? boldFont : font,
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: style
+            ]
+
+            return NSAttributedString(string: text + "\n", attributes: attrs)
         }
 
         // Header row.
-        output.append(NSAttributedString(string: padded(table.headers), attributes: headerAttrs))
-
-        // Separator.
-        let separator = widths.map { String(repeating: "─", count: $0) }.joined(separator: "──┼──")
-        output.append(NSAttributedString(string: "\n" + separator, attributes: baseAttrs))
+        for (col, header) in table.headers.enumerated() {
+            output.append(cellString(header, row: 0, col: col, isHeader: true))
+        }
 
         // Data rows.
-        for row in table.rows {
-            output.append(NSAttributedString(string: "\n" + padded(row), attributes: baseAttrs))
+        for (rowIndex, row) in table.rows.enumerated() {
+            for col in 0..<columnCount {
+                let text = col < row.count ? row[col] : ""
+                output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false))
+            }
         }
     }
 
