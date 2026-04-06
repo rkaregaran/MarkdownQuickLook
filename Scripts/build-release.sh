@@ -25,16 +25,13 @@ rm -rf "$DIST_DIR" "$DERIVED_DATA_PATH"
 mkdir -p "$DIST_DIR"
 
 signing_args=(CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS=)
-if [[ "${CI:-}" != "true" ]]; then
-  signing_args=()
-  if [[ "$NOTARIZE" == "true" && -z "${DEVELOPER_ID_IDENTITY:-}" ]]; then
-    DEVELOPER_ID_IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
-    if [[ -z "$DEVELOPER_ID_IDENTITY" ]]; then
-      echo "Error: --notarize requires a Developer ID Application certificate in your keychain"
-      exit 1
-    fi
-    echo "Found: $DEVELOPER_ID_IDENTITY"
+if [[ "$NOTARIZE" == "true" && -z "${DEVELOPER_ID_IDENTITY:-}" ]]; then
+  DEVELOPER_ID_IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+  if [[ -z "$DEVELOPER_ID_IDENTITY" ]]; then
+    echo "Error: --notarize requires a Developer ID Application certificate in your keychain"
+    exit 1
   fi
+  echo "Found: $DEVELOPER_ID_IDENTITY"
 fi
 
 xcodebuild \
@@ -49,30 +46,35 @@ xcodebuild \
 
 ditto "$APP_PATH" "$DIST_APP_PATH"
 
-# Re-sign with Developer ID if available (CI with certificate).
+SIGNING_IDENTITY="${DEVELOPER_ID_IDENTITY:--}"
+SIGNING_EXTRA_ARGS=()
 if [[ -n "${DEVELOPER_ID_IDENTITY:-}" ]]; then
-  echo "Re-signing with: $DEVELOPER_ID_IDENTITY"
-
-  # Sign extensions first, then the app (inside-out).
-  PREVIEW_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
-  codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
-    --entitlements "$ROOT/MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements" \
-    --options runtime \
-    "$PREVIEW_PATH"
-
-  THUMBNAIL_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookThumbnailExtension.appex"
-  if [[ -d "$THUMBNAIL_PATH" ]]; then
-    codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
-      --entitlements "$ROOT/MarkdownQuickLookThumbnailExtension/MarkdownQuickLookThumbnailExtension.entitlements" \
-      --options runtime \
-      "$THUMBNAIL_PATH"
-  fi
-
-  codesign --force --sign "$DEVELOPER_ID_IDENTITY" \
-    --entitlements "$ROOT/MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements" \
-    --options runtime \
-    "$DIST_APP_PATH"
+  echo "Re-signing with Developer ID: $DEVELOPER_ID_IDENTITY"
+  SIGNING_EXTRA_ARGS=(--options runtime)
+else
+  echo "Re-signing ad-hoc with entitlements for local use"
 fi
+
+# Sign extensions first, then the app (inside-out).
+PREVIEW_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
+codesign --force --sign "$SIGNING_IDENTITY" \
+  --entitlements "$ROOT/MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements" \
+  "${SIGNING_EXTRA_ARGS[@]}" \
+  "$PREVIEW_PATH"
+
+THUMBNAIL_PATH="$DIST_APP_PATH/Contents/PlugIns/MarkdownQuickLookThumbnailExtension.appex"
+if [[ -d "$THUMBNAIL_PATH" ]]; then
+  codesign --force --sign "$SIGNING_IDENTITY" \
+    --entitlements "$ROOT/MarkdownQuickLookThumbnailExtension/MarkdownQuickLookThumbnailExtension.entitlements" \
+    "${SIGNING_EXTRA_ARGS[@]}" \
+    "$THUMBNAIL_PATH"
+fi
+
+codesign --force --sign "$SIGNING_IDENTITY" \
+  --entitlements "$ROOT/MarkdownQuickLookApp/MarkdownQuickLookApp.entitlements" \
+  "${SIGNING_EXTRA_ARGS[@]}" \
+  "$DIST_APP_PATH"
+
 cp "$LICENSE_PATH" "$DIST_LICENSE_PATH"
 
 "$ROOT/Scripts/check-preview-runtime.sh" "$DIST_APP_PATH"

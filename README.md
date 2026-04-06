@@ -141,3 +141,5 @@ Add these secrets at your repository's Settings > Secrets and variables > Action
 | `NOTARY_KEY_ID` | Key ID from App Store Connect |
 | `NOTARY_ISSUER_ID` | Issuer ID from App Store Connect |
 | `KEYCHAIN_PASSWORD` | Any random string (e.g., `openssl rand -base64 24`) |
+
+For a real-world release-signing postmortem and debugging checklist, see [docs/notarization-debugging/README.md](/Users/reza.karegaran/Code/quicklook-md/docs/notarization-debugging/README.md).
