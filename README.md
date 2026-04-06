@@ -73,6 +73,22 @@ Build a release package:
 ./Scripts/build-release.sh
 ```
 
+## Uninstall
+
+To remove MarkdownQuickLook app bundles and stale Quick Look registrations from your Mac:
+
+```bash
+./Scripts/uninstall-markdown-quicklook.sh
+```
+
+This script:
+
+- unregisters MarkdownQuickLook preview and thumbnail extensions
+- deletes matching `MarkdownQuickLook.app` and legacy `MarkdownQuickLookApp.app` bundles from common install/build locations
+- resets Quick Look caches
+
+It does not prompt for confirmation before deleting matching app bundles.
+
 ## Automated Releases
 
 Every push to `main` creates a new rolling GitHub release through GitHub Actions.
