@@ -2,22 +2,26 @@
 
 set -euo pipefail
 
-ROOT="$(mktemp -d)"
-trap 'rm -rf "$ROOT"' EXIT
+TEST_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEST_DIR"' EXIT
 
+ROOT="$TEST_DIR/repo"
+BIN_DIR="$TEST_DIR/bin"
+LOG_DIR="$TEST_DIR/logs"
+HOME_DIR="$TEST_DIR/home"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-mkdir -p "$ROOT/Scripts"
-mkdir -p "$ROOT/fake-bin"
-mkdir -p "$ROOT/home/Applications"
-mkdir -p "$ROOT/Applications"
-mkdir -p "$ROOT/private/tmp/MarkdownQuickLookApp.app/Contents"
-mkdir -p "$ROOT/private/tmp/Other.app/Contents"
-mkdir -p "$ROOT/Library/Developer/Xcode/DerivedData/Build/Products/Debug/MarkdownQuickLook.app/Contents"
-
+mkdir -p "$ROOT/Scripts" "$BIN_DIR" "$LOG_DIR" "$HOME_DIR/Applications" "$HOME_DIR/Applications/Other" "$TEST_DIR/legacy"
 cp "$REPO_ROOT/Scripts/uninstall-markdown-quicklook.sh" "$ROOT/Scripts/uninstall-markdown-quicklook.sh"
+chmod +x "$ROOT/Scripts/uninstall-markdown-quicklook.sh"
 
-cat > "$ROOT/home/Applications/MarkdownQuickLook.app/Contents/Info.plist" <<'PLIST'
+MATCHING_APP="$HOME_DIR/Applications/MarkdownQuickLook.app"
+LEGACY_APP="$TEST_DIR/legacy/MarkdownQuickLookApp.app"
+SKIPPED_APP="$HOME_DIR/Applications/Other/MarkdownQuickLook.app"
+
+mkdir -p "$MATCHING_APP/Contents" "$LEGACY_APP/Contents" "$SKIPPED_APP/Contents"
+
+cat > "$MATCHING_APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -28,7 +32,7 @@ cat > "$ROOT/home/Applications/MarkdownQuickLook.app/Contents/Info.plist" <<'PLI
 </plist>
 PLIST
 
-cat > "$ROOT/private/tmp/MarkdownQuickLookApp.app/Contents/Info.plist" <<'PLIST'
+cat > "$LEGACY_APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -39,67 +43,109 @@ cat > "$ROOT/private/tmp/MarkdownQuickLookApp.app/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-cat > "$ROOT/Library/Developer/Xcode/DerivedData/Build/Products/Debug/MarkdownQuickLook.app/Contents/Info.plist" <<'PLIST'
+cat > "$SKIPPED_APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.rzkr.MarkdownQuickLook.app</string>
+  <string>com.example.SomeOtherApp</string>
 </dict>
 </plist>
 PLIST
 
-cat > "$ROOT/private/tmp/Other.app/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key>
-  <string>com.example.OtherApp</string>
-</dict>
-</plist>
-PLIST
-
-cat > "$ROOT/fake-bin/pluginkit" <<'SH'
+cat > "$BIN_DIR/pluginkit" <<EOF
 #!/bin/zsh
 set -euo pipefail
-printf '%s\n' "$*" >> "$TEST_LOG"
-if [[ "$1" == "-mDvvv" ]]; then
-  cat <<EOF
-+    plugin: com.rzkr.MarkdownQuickLook.app.preview
-        Path = $TEST_ROOT/home/Applications/MarkdownQuickLook.app/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex
-        Path = $TEST_ROOT/private/tmp/MarkdownQuickLookApp.app/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex
-+    plugin: com.example.MarkdownQuickLook.app.preview
-        Path = $TEST_ROOT/Library/Developer/Xcode/DerivedData/Build/Products/Debug/MarkdownQuickLook.app/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex
+printf '%s\n' "\$*" >> "$LOG_DIR/pluginkit.log"
+if [[ "\$1" == "-mDvvv" ]]; then
+  case "\$3" in
+    com.rzkr.MarkdownQuickLook.app.preview)
+      cat <<'OUT'
+    Path = /tmp/MarkdownQuickLookPreviewExtension.appex
+OUT
+      ;;
+    com.rzkr.MarkdownQuickLook.app.thumbnail)
+      cat <<'OUT'
+    Path = /tmp/MarkdownQuickLookThumbnailExtension.appex
+OUT
+      ;;
+    com.example.MarkdownQuickLook.app.preview)
+      cat <<'OUT'
+    Path = /tmp/LegacyMarkdownQuickLookPreviewExtension.appex
+OUT
+      ;;
+  esac
+fi
 EOF
-fi
-SH
-chmod +x "$ROOT/fake-bin/pluginkit"
+chmod +x "$BIN_DIR/pluginkit"
 
-cat > "$ROOT/fake-bin/qlmanage" <<'SH'
+cat > "$BIN_DIR/qlmanage" <<EOF
 #!/bin/zsh
 set -euo pipefail
-printf 'qlmanage %s\n' "$*" >> "$TEST_LOG"
-SH
-chmod +x "$ROOT/fake-bin/qlmanage"
+printf '%s\n' "\$*" >> "$LOG_DIR/qlmanage.log"
+EOF
+chmod +x "$BIN_DIR/qlmanage"
 
-export HOME="$ROOT/home"
-export TEST_ROOT="$ROOT"
-export TEST_LOG="$ROOT/commands.log"
-export PATH="$ROOT/fake-bin:/usr/bin:/bin:/usr/sbin:/sbin"
+HOME="$HOME_DIR" \
+PATH="$BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin" \
+MARKDOWN_QUICKLOOK_SEARCH_ROOTS="$HOME_DIR:$HOME_DIR/Applications:$TEST_DIR/legacy" \
+zsh "$ROOT/Scripts/uninstall-markdown-quicklook.sh" > "$LOG_DIR/output.log"
 
-pushd "$ROOT" >/dev/null
-if zsh Scripts/uninstall-markdown-quicklook.sh >"$ROOT/output.txt" 2>"$ROOT/error.txt"; then
-  echo "expected uninstall script to fail before implementation exists"
-  exit 1
-fi
-popd >/dev/null
-
-if ! grep -q "No such file or directory" "$ROOT/error.txt"; then
-  echo "expected missing script error"
-  cat "$ROOT/error.txt"
+if [[ -d "$MATCHING_APP" ]]; then
+  echo "Expected matching MarkdownQuickLook.app bundle to be deleted" >&2
   exit 1
 fi
 
-echo "red phase passed: uninstall script is not implemented yet"
+if [[ -d "$LEGACY_APP" ]]; then
+  echo "Expected matching legacy MarkdownQuickLookApp.app bundle to be deleted" >&2
+  exit 1
+fi
+
+if [[ ! -d "$SKIPPED_APP" ]]; then
+  echo "Expected non-matching MarkdownQuickLook.app bundle to be preserved" >&2
+  exit 1
+fi
+
+if ! grep -q -- "-r /tmp/MarkdownQuickLookPreviewExtension.appex" "$LOG_DIR/pluginkit.log"; then
+  echo "Expected preview extension removal command" >&2
+  exit 1
+fi
+
+if ! grep -q -- "-r /tmp/MarkdownQuickLookThumbnailExtension.appex" "$LOG_DIR/pluginkit.log"; then
+  echo "Expected thumbnail extension removal command" >&2
+  exit 1
+fi
+
+if ! grep -q -- "-r /tmp/LegacyMarkdownQuickLookPreviewExtension.appex" "$LOG_DIR/pluginkit.log"; then
+  echo "Expected legacy preview extension removal command" >&2
+  exit 1
+fi
+
+if ! grep -q -- "^-r$" "$LOG_DIR/qlmanage.log"; then
+  echo "Expected qlmanage reset command" >&2
+  exit 1
+fi
+
+if ! grep -q -- "^-r cache$" "$LOG_DIR/qlmanage.log"; then
+  echo "Expected qlmanage cache reset command" >&2
+  exit 1
+fi
+
+if [[ "$(grep -Fc -- "$SKIPPED_APP" "$LOG_DIR/output.log")" -ne 1 ]]; then
+  echo "Expected skipped app bundle to appear once in output summary" >&2
+  cat "$LOG_DIR/output.log"
+  exit 1
+fi
+
+if ! grep -Fq -- "$MATCHING_APP" "$LOG_DIR/output.log"; then
+  echo "Expected removed app bundle to appear in output summary" >&2
+  exit 1
+fi
+
+if ! grep -Fq -- "$LEGACY_APP" "$LOG_DIR/output.log"; then
+  echo "Expected removed legacy app bundle to appear in output summary" >&2
+  exit 1
+fi
+
+echo "uninstall-markdown-quicklook test passed"
