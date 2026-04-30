@@ -9,19 +9,33 @@ final class ThumbnailProvider: QLThumbnailProvider {
     ) {
         let maximumSize = request.maximumSize
         let scale = request.scale
+        let requestInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.request")
 
         handler(QLThumbnailReply(contextSize: maximumSize, drawing: { context -> Bool in
+            defer { MarkdownPerformanceInstrumentation.end(requestInterval) }
+
             let renderer = MarkdownDocumentRenderer()
 
-            guard let document = try? renderer.prepareDocument(fileAt: request.fileURL) else {
+            let prepareInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.prepare")
+            let document: MarkdownPreparedDocument
+            do {
+                defer { MarkdownPerformanceInstrumentation.end(prepareInterval) }
+                document = try renderer.prepareDocument(fileAt: request.fileURL)
+            } catch {
+                MarkdownPerformanceInstrumentation.event("thumbnail.failure")
                 return false
             }
 
+            let renderInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.render")
+            defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
             let payload = DispatchQueue.main.sync {
                 renderer.render(document: document)
             }
 
             let attributed = payload.attributedContent
+
+            let drawInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.draw")
+            defer { MarkdownPerformanceInstrumentation.end(drawInterval) }
 
             // Set up drawing area with padding.
             let padding: CGFloat = 8
@@ -34,7 +48,9 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
             // Draw background.
             let nsContext = NSGraphicsContext(cgContext: context, flipped: true)
+            let previousContext = NSGraphicsContext.current
             NSGraphicsContext.current = nsContext
+            defer { NSGraphicsContext.current = previousContext }
 
             NSColor.textBackgroundColor.setFill()
             NSBezierPath(rect: CGRect(origin: .zero, size: maximumSize)).fill()
@@ -42,7 +58,9 @@ final class ThumbnailProvider: QLThumbnailProvider {
             // Draw the attributed string, clipped to the thumbnail area.
             attributed.drawInRect(drawRect)
 
-            NSGraphicsContext.current = nil
+            MarkdownPerformanceInstrumentation.debug(
+                "thumbnail.request scale=\(scale) width=\(Int(maximumSize.width)) height=\(Int(maximumSize.height)) characters=\(attributed.length)"
+            )
             return true
         }), nil)
     }
