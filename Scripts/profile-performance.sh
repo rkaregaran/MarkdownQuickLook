@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_PATH="$ROOT/.derivedData/performance-profile"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug/MarkdownQuickLook.app"
+PREVIEW_EXTENSION_PATH="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
+THUMBNAIL_EXTENSION_PATH="$APP_PATH/Contents/PlugIns/MarkdownQuickLookThumbnailExtension.appex"
 PREVIEW_EXTENSION_ID="com.rzkr.MarkdownQuickLook.app.preview"
 THUMBNAIL_EXTENSION_ID="com.rzkr.MarkdownQuickLook.app.thumbnail"
 
@@ -18,29 +20,26 @@ sign_if_present() {
 }
 
 sign_local_profiling_app() {
-  local preview_appex="$APP_PATH/Contents/PlugIns/MarkdownQuickLookPreviewExtension.appex"
-  local thumbnail_appex="$APP_PATH/Contents/PlugIns/MarkdownQuickLookThumbnailExtension.appex"
-
   sign_if_present "$APP_PATH/Contents/MacOS/MarkdownQuickLook.debug.dylib"
   sign_if_present "$APP_PATH/Contents/MacOS/__preview.dylib"
-  sign_if_present "$preview_appex/Contents/MacOS/MarkdownQuickLookPreviewExtension.debug.dylib"
-  sign_if_present "$preview_appex/Contents/MacOS/__preview.dylib"
-  sign_if_present "$thumbnail_appex/Contents/MacOS/MarkdownQuickLookThumbnailExtension.debug.dylib"
-  sign_if_present "$thumbnail_appex/Contents/MacOS/__preview.dylib"
+  sign_if_present "$PREVIEW_EXTENSION_PATH/Contents/MacOS/MarkdownQuickLookPreviewExtension.debug.dylib"
+  sign_if_present "$PREVIEW_EXTENSION_PATH/Contents/MacOS/__preview.dylib"
+  sign_if_present "$THUMBNAIL_EXTENSION_PATH/Contents/MacOS/MarkdownQuickLookThumbnailExtension.debug.dylib"
+  sign_if_present "$THUMBNAIL_EXTENSION_PATH/Contents/MacOS/__preview.dylib"
 
   /usr/bin/codesign \
     --force \
     --sign - \
     --entitlements "$ROOT/MarkdownQuickLookPreviewExtension/MarkdownQuickLookPreviewExtension.entitlements" \
     --timestamp=none \
-    "$preview_appex"
+    "$PREVIEW_EXTENSION_PATH"
 
   /usr/bin/codesign \
     --force \
     --sign - \
     --entitlements "$ROOT/MarkdownQuickLookThumbnailExtension/MarkdownQuickLookThumbnailExtension.entitlements" \
     --timestamp=none \
-    "$thumbnail_appex"
+    "$THUMBNAIL_EXTENSION_PATH"
 
   /usr/bin/codesign \
     --force \
@@ -52,20 +51,55 @@ sign_local_profiling_app() {
   /usr/bin/codesign --verify --deep --strict "$APP_PATH"
 }
 
+register_local_extensions() {
+  pluginkit -a "$PREVIEW_EXTENSION_PATH" "$THUMBNAIL_EXTENSION_PATH"
+}
+
+remove_stale_extension_registrations() {
+  remove_stale_extension_registration "$PREVIEW_EXTENSION_ID" "$PREVIEW_EXTENSION_PATH"
+  remove_stale_extension_registration "$THUMBNAIL_EXTENSION_ID" "$THUMBNAIL_EXTENSION_PATH"
+}
+
+remove_stale_extension_registration() {
+  local extension_id="$1"
+  local expected_path="$2"
+  local registrations
+  local line
+  local plugin_path
+
+  registrations="$(pluginkit -m -D -v -i "$extension_id" || true)"
+
+  while IFS= read -r line; do
+    [[ "$line" == *"$extension_id"* ]] || continue
+    plugin_path="${line##*$'\t'}"
+    [[ "$plugin_path" == "$expected_path" ]] && continue
+    [[ "$plugin_path" == /*.appex ]] || continue
+
+    pluginkit -r "$plugin_path" || true
+  done <<< "$registrations"
+}
+
 verify_extension_registration() {
-  local registration_output
+  local preview_registration
+  local thumbnail_registration
 
-  registration_output="$(pluginkit -m -A | grep -F 'com.rzkr.MarkdownQuickLook.app.' || true)"
+  preview_registration="$(pluginkit -m -v -i "$PREVIEW_EXTENSION_ID" || true)"
+  thumbnail_registration="$(pluginkit -m -v -i "$THUMBNAIL_EXTENSION_ID" || true)"
 
-  if [[ "$registration_output" != *"$PREVIEW_EXTENSION_ID"* ]] ||
-    [[ "$registration_output" != *"$THUMBNAIL_EXTENSION_ID"* ]]; then
-    echo "PlugInKit did not register both MarkdownQuickLook extensions." >&2
+  if [[ "$preview_registration" != *"$PREVIEW_EXTENSION_ID"* ]] ||
+    [[ "$preview_registration" != *"$PREVIEW_EXTENSION_PATH"* ]] ||
+    [[ "$thumbnail_registration" != *"$THUMBNAIL_EXTENSION_ID"* ]] ||
+    [[ "$thumbnail_registration" != *"$THUMBNAIL_EXTENSION_PATH"* ]]; then
+    echo "PlugInKit did not register both local MarkdownQuickLook extensions." >&2
     echo "Expected:" >&2
-    echo "  $PREVIEW_EXTENSION_ID" >&2
-    echo "  $THUMBNAIL_EXTENSION_ID" >&2
+    echo "  $PREVIEW_EXTENSION_ID at $PREVIEW_EXTENSION_PATH" >&2
+    echo "  $THUMBNAIL_EXTENSION_ID at $THUMBNAIL_EXTENSION_PATH" >&2
     echo "Observed:" >&2
-    if [[ -n "$registration_output" ]]; then
-      echo "$registration_output" | sed 's/^/  /' >&2
+    if [[ -n "$preview_registration" ]] || [[ -n "$thumbnail_registration" ]]; then
+      {
+        echo "$preview_registration"
+        echo "$thumbnail_registration"
+      } | sed '/^$/d; s/^/  /' >&2
     else
       echo "  <none>" >&2
     fi
@@ -74,7 +108,10 @@ verify_extension_registration() {
 
   echo
   echo "Extension registration:"
-  echo "$registration_output" | sed 's/^/  /'
+  {
+    echo "$preview_registration"
+    echo "$thumbnail_registration"
+  } | sed '/^$/d; s/^/  /'
 }
 
 xcodegen generate
@@ -92,11 +129,15 @@ sign_local_profiling_app
 
 "$ROOT/Scripts/check-preview-runtime.sh" "$APP_PATH"
 
+remove_stale_extension_registrations
+register_local_extensions
 open "$APP_PATH"
 sleep 2
 
 pluginkit -e use -i "$PREVIEW_EXTENSION_ID"
 pluginkit -e use -i "$THUMBNAIL_EXTENSION_ID"
+remove_stale_extension_registrations
+register_local_extensions
 verify_extension_registration
 
 qlmanage -r
