@@ -62,39 +62,76 @@ public final class MarkdownDocumentRenderer {
     }
 
     public func prepareDocument(fileAt url: URL) throws -> MarkdownPreparedDocument {
+        let prepareInterval = MarkdownPerformanceInstrumentation.begin("renderer.prepareDocument")
+        defer { MarkdownPerformanceInstrumentation.end(prepareInterval) }
+
         try throwIfCancelled()
         let source: String
 
         do {
+            let readInterval = MarkdownPerformanceInstrumentation.begin("renderer.readFile")
+            defer { MarkdownPerformanceInstrumentation.end(readInterval) }
             source = try String(contentsOf: url, encoding: .utf8)
         } catch {
+            MarkdownPerformanceInstrumentation.event("renderer.readFile.failure")
             throw MarkdownDocumentRendererError.unreadableFile(url)
         }
 
         try throwIfCancelled()
 
         guard source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            MarkdownPerformanceInstrumentation.event("renderer.emptyDocument")
             throw MarkdownDocumentRendererError.emptyDocument(url)
         }
+
+        let parseInterval = MarkdownPerformanceInstrumentation.begin("renderer.parseBlocks")
+        let blocks: [MarkdownBlock]
+        do {
+            defer { MarkdownPerformanceInstrumentation.end(parseInterval) }
+            blocks = try parseBlocks(in: source)
+        }
+
+        #if DEBUG
+        let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey])
+        let fileSize = resourceValues?.fileSize ?? source.utf8.count
+        MarkdownPerformanceInstrumentation.debug(
+            "renderer.prepareDocument fileSize=\(fileSize) characters=\(source.count) blocks=\(blocks.count)"
+        )
+        #endif
 
         return MarkdownPreparedDocument(
             title: url.lastPathComponent,
             baseURL: url.deletingLastPathComponent(),
-            blocks: try parseBlocks(in: source)
+            blocks: blocks
         )
     }
 
     @MainActor
     public func render(document: MarkdownPreparedDocument) -> MarkdownRenderPayload {
+        let renderInterval = MarkdownPerformanceInstrumentation.begin("renderer.renderDocument")
+        defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
+
         let formatted = NSMutableAttributedString()
+        #if DEBUG
+        var blockCounts: [String: Int] = [:]
+        #endif
 
         for (index, block) in document.blocks.enumerated() {
+            #if DEBUG
+            recordRenderedBlock(block, counts: &blockCounts)
+            #endif
             append(block, to: formatted, baseURL: document.baseURL)
 
             if index < document.blocks.count - 1 {
                 formatted.append(NSAttributedString(string: "\n\n"))
             }
         }
+
+        #if DEBUG
+        MarkdownPerformanceInstrumentation.debug(
+            "renderer.renderDocument characters=\(formatted.length) \(instrumentationSummary(from: blockCounts))"
+        )
+        #endif
 
         return MarkdownRenderPayload(
             title: document.title,
@@ -107,10 +144,19 @@ public final class MarkdownDocumentRenderer {
         document: MarkdownPreparedDocument,
         shouldContinue: @escaping @MainActor @Sendable () -> Bool
     ) async throws -> MarkdownRenderPayload {
+        let renderInterval = MarkdownPerformanceInstrumentation.begin("renderer.renderDocument")
+        defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
+
         let formatted = NSMutableAttributedString()
+        #if DEBUG
+        var blockCounts: [String: Int] = [:]
+        #endif
 
         for (index, block) in document.blocks.enumerated() {
             try ensureRenderingCanContinue(shouldContinue)
+            #if DEBUG
+            recordRenderedBlock(block, counts: &blockCounts)
+            #endif
             append(block, to: formatted, baseURL: document.baseURL)
 
             if index < document.blocks.count - 1 {
@@ -120,6 +166,12 @@ public final class MarkdownDocumentRenderer {
         }
 
         try ensureRenderingCanContinue(shouldContinue)
+
+        #if DEBUG
+        MarkdownPerformanceInstrumentation.debug(
+            "renderer.renderDocument characters=\(formatted.length) \(instrumentationSummary(from: blockCounts))"
+        )
+        #endif
 
         return MarkdownRenderPayload(
             title: document.title,
@@ -598,6 +650,9 @@ public final class MarkdownDocumentRenderer {
         baseURL: URL,
         baseAttributes: [NSAttributedString.Key: Any]
     ) -> NSMutableAttributedString {
+        let interval = MarkdownPerformanceInstrumentation.begin("renderer.inlineMarkdown")
+        defer { MarkdownPerformanceInstrumentation.end(interval) }
+
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         let parsed = (try? AttributedString(markdown: text, options: options, baseURL: baseURL)) ?? AttributedString(text)
         let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
@@ -730,6 +785,12 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func appendTable(_ table: MarkdownTable, to output: NSMutableAttributedString) {
+        let interval = MarkdownPerformanceInstrumentation.begin("renderer.tableRender")
+        defer { MarkdownPerformanceInstrumentation.end(interval) }
+        MarkdownPerformanceInstrumentation.debug(
+            "renderer.tableRender columns=\(table.headers.count) rows=\(table.rows.count)"
+        )
+
         let scale = settings.textSizeLevel.scaleFactor
         let font = settings.fontFamily.font(ofSize: 13 * scale, weight: .regular)
         let boldFont = settings.fontFamily.font(ofSize: 13 * scale, weight: .semibold)
@@ -850,13 +911,19 @@ public final class MarkdownDocumentRenderer {
         if path.hasPrefix("/") {
             imageURL = URL(fileURLWithPath: path)
         } else if path.hasPrefix("http://") || path.hasPrefix("https://") {
+            MarkdownPerformanceInstrumentation.event("renderer.imageLoad.remoteSkipped")
             appendImageFallback(alt: alt, to: output)
             return
         } else {
             imageURL = baseURL.appendingPathComponent(path)
         }
 
-        guard let image = NSImage(contentsOf: imageURL) else {
+        let imageInterval = MarkdownPerformanceInstrumentation.begin("renderer.imageLoad")
+        let image = NSImage(contentsOf: imageURL)
+        MarkdownPerformanceInstrumentation.end(imageInterval)
+
+        guard let image else {
+            MarkdownPerformanceInstrumentation.event("renderer.imageLoad.failure")
             appendImageFallback(alt: alt, to: output)
             return
         }
@@ -891,6 +958,12 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func applySyntaxHighlighting(to attributed: NSMutableAttributedString, language: String?, font: NSFont) {
+        let interval = MarkdownPerformanceInstrumentation.begin("renderer.syntaxHighlight")
+        defer { MarkdownPerformanceInstrumentation.end(interval) }
+        MarkdownPerformanceInstrumentation.debug(
+            "renderer.syntaxHighlight language=\(language ?? "none") characters=\(attributed.length)"
+        )
+
         let code = attributed.string
         let fullRange = NSRange(location: 0, length: attributed.length)
         let boldFont = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
@@ -1021,6 +1094,17 @@ public final class MarkdownDocumentRenderer {
 
         // Types (capitalized identifiers — simple heuristic).
         applyPattern("\\b[A-Z][a-zA-Z0-9]+\\b", color: typeColor)
+    }
+
+    private func recordRenderedBlock(_ block: MarkdownBlock, counts: inout [String: Int]) {
+        counts[block.instrumentationName, default: 0] += 1
+    }
+
+    private func instrumentationSummary(from counts: [String: Int]) -> String {
+        counts
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: " ")
     }
 
     private func throwIfCancelled() throws {
@@ -1265,6 +1349,31 @@ public final class MarkdownDocumentRenderer {
         return nil
     }
 
+}
+
+private extension MarkdownBlock {
+    var instrumentationName: String {
+        switch self {
+        case .frontMatter:
+            return "frontMatter"
+        case .heading:
+            return "heading"
+        case .paragraph:
+            return "paragraph"
+        case .quote:
+            return "quote"
+        case .list:
+            return "list"
+        case .code:
+            return "code"
+        case .table:
+            return "table"
+        case .horizontalRule:
+            return "horizontalRule"
+        case .image:
+            return "image"
+        }
+    }
 }
 
 private final class QuoteBorderTextBlock: NSTextBlock {
