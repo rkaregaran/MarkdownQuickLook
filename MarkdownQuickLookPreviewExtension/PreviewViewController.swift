@@ -65,6 +65,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     func preparePreviewOfFile(at url: URL) async throws {
+        let requestInterval = MarkdownPerformanceInstrumentation.begin("preview.request")
+        var requestIntervalEnded = false
+        func endRequestInterval() {
+            guard requestIntervalEnded == false else { return }
+            requestIntervalEnded = true
+            MarkdownPerformanceInstrumentation.end(requestInterval)
+        }
+        defer { endRequestInterval() }
+
         preferredContentSize = PreviewSizing.loadingPreferredContentSize
         let request = loadingCoordinator.beginRequest {
             self.prepareDocumentResultProvider(url)
@@ -78,11 +87,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         }
 
         guard Task.isCancelled == false else {
+            MarkdownPerformanceInstrumentation.event("preview.cancel")
             _ = loadingCoordinator.cancelRequest(request.requestID, task: request.task)
             return
         }
 
         guard loadingCoordinator.isActive(request.requestID) else {
+            MarkdownPerformanceInstrumentation.event("preview.stale")
             return
         }
 
@@ -93,40 +104,57 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     self.loadingCoordinator.isActive(request.requestID)
                 }
                 guard loadingCoordinator.finishRequest(request.requestID) else {
+                    MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
-                hostingView.rootView = PreviewRootView(
-                    title: payload.title,
-                    message: nil,
-                    attributedContent: payload.attributedContent
+                do {
+                    let applyInterval = MarkdownPerformanceInstrumentation.begin("preview.applyView")
+                    defer { MarkdownPerformanceInstrumentation.end(applyInterval) }
+                    hostingView.rootView = PreviewRootView(
+                        title: payload.title,
+                        message: nil,
+                        attributedContent: payload.attributedContent
+                    )
+                    preferredContentSize = PreviewSizing.preferredContentSize(
+                        forRenderedText: payload.attributedContent.string
+                    )
+                }
+                MarkdownPerformanceInstrumentation.debug(
+                    "preview.request renderedCharacters=\(payload.attributedContent.length)"
                 )
-                preferredContentSize = PreviewSizing.preferredContentSize(
-                    forRenderedText: payload.attributedContent.string
-                )
+                endRequestInterval()
             case .rendererError(let error):
                 guard loadingCoordinator.finishRequest(request.requestID) else {
+                    MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
+                MarkdownPerformanceInstrumentation.event("preview.failure")
                 hostingView.rootView = PreviewRootView(
                     title: url.lastPathComponent,
                     message: error.errorDescription,
                     attributedContent: nil
                 )
                 preferredContentSize = PreviewSizing.errorPreferredContentSize
+                endRequestInterval()
             case .failure(let message):
                 guard loadingCoordinator.finishRequest(request.requestID) else {
+                    MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
+                MarkdownPerformanceInstrumentation.event("preview.failure")
                 hostingView.rootView = PreviewRootView(
                     title: url.lastPathComponent,
                     message: message,
                     attributedContent: nil
                 )
                 preferredContentSize = PreviewSizing.errorPreferredContentSize
+                endRequestInterval()
             case .cancelled:
+                MarkdownPerformanceInstrumentation.event("preview.cancel")
                 _ = loadingCoordinator.cancelRequest(request.requestID, task: request.task)
             }
         } catch is CancellationError {
+            MarkdownPerformanceInstrumentation.event("preview.cancel")
             _ = loadingCoordinator.cancelRequest(request.requestID, task: request.task)
         }
     }
@@ -160,7 +188,12 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         for document: MarkdownPreparedDocument,
         shouldContinue: @escaping @MainActor @Sendable () -> Bool
     ) async throws -> MarkdownRenderPayload {
+        let settingsInterval = MarkdownPerformanceInstrumentation.begin("preview.settings")
         let settings = MarkdownSettingsStore().settings
+        MarkdownPerformanceInstrumentation.end(settingsInterval)
+
+        let renderInterval = MarkdownPerformanceInstrumentation.begin("preview.render")
+        defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
         return try await MarkdownDocumentRenderer(settings: settings).render(document: document, shouldContinue: shouldContinue)
     }
 
