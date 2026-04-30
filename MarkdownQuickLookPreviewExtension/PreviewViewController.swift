@@ -76,7 +76,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
         preferredContentSize = PreviewSizing.loadingPreferredContentSize
         let request = loadingCoordinator.beginRequest {
-            self.prepareDocumentResultProvider(url)
+            let prepareInterval = MarkdownPerformanceInstrumentation.begin("preview.prepare")
+            defer { MarkdownPerformanceInstrumentation.end(prepareInterval) }
+            return self.prepareDocumentResultProvider(url)
         }
         hostingView.rootView = loadingRootView(for: url)
 
