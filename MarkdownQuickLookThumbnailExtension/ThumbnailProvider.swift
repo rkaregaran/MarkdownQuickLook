@@ -26,11 +26,13 @@ final class ThumbnailProvider: QLThumbnailProvider {
                 return false
             }
 
-            let renderInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.render")
-            defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
-            let payload = DispatchQueue.main.sync {
-                renderer.render(document: document)
-            }
+            let payload = {
+                let renderInterval = MarkdownPerformanceInstrumentation.begin("thumbnail.render")
+                defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
+                return DispatchQueue.main.sync {
+                    renderer.render(document: document)
+                }
+            }()
 
             let attributed = payload.attributedContent
 
