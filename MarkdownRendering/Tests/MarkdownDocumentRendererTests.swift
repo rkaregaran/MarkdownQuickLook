@@ -212,6 +212,60 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(font?.isFixedPitch == true)
     }
 
+    func testRenderSyntaxHighlightingColorsSwiftTokens() throws {
+        let payload = try renderDocument(
+            """
+            ```swift
+            struct Widget {
+                let count = 42
+                let label = "Ready"
+            }
+            ```
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+
+        let structRange = nsString.range(of: "struct")
+        let widgetRange = nsString.range(of: "Widget")
+        let numberRange = nsString.range(of: "42")
+        let stringRange = nsString.range(of: "\"Ready\"")
+
+        let structColor = rendered.attribute(.foregroundColor, at: structRange.location, effectiveRange: nil) as? NSColor
+        let widgetColor = rendered.attribute(.foregroundColor, at: widgetRange.location, effectiveRange: nil) as? NSColor
+        let numberColor = rendered.attribute(.foregroundColor, at: numberRange.location, effectiveRange: nil) as? NSColor
+        let stringColor = rendered.attribute(.foregroundColor, at: stringRange.location, effectiveRange: nil) as? NSColor
+        let keywordFont = rendered.attribute(.font, at: structRange.location, effectiveRange: nil) as? NSFont
+
+        XCTAssertEqual(structColor, NSColor.systemPink)
+        XCTAssertEqual(widgetColor, NSColor.systemPurple)
+        XCTAssertEqual(numberColor, NSColor.systemBlue)
+        XCTAssertEqual(stringColor, NSColor.systemGreen)
+        XCTAssertTrue(keywordFont?.fontDescriptor.symbolicTraits.contains(.bold) == true)
+    }
+
+    func testRenderSyntaxHighlightingDoesNotOverwriteCommentColor() throws {
+        let payload = try renderDocument(
+            """
+            ```swift
+            // let Widget = 42
+            let value = 1
+            ```
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+
+        let commentKeywordRange = nsString.range(of: "let Widget")
+        let realKeywordRange = nsString.range(of: "let value")
+
+        let commentColor = rendered.attribute(.foregroundColor, at: commentKeywordRange.location, effectiveRange: nil) as? NSColor
+        let realKeywordColor = rendered.attribute(.foregroundColor, at: realKeywordRange.location, effectiveRange: nil) as? NSColor
+
+        XCTAssertEqual(commentColor, NSColor.secondaryLabelColor)
+        XCTAssertEqual(realKeywordColor, NSColor.systemPink)
+    }
+
     func testRenderPreservesBodyInlineCodeThroughTextViewRendering() throws {
         let payload = try renderDocument("Paragraph with `code` and **bold** text.").payload
         let rendered = renderedTextStorage(from: payload.attributedContent)
