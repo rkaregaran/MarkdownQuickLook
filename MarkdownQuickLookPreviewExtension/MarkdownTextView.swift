@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import MarkdownRendering
 import SwiftUI
 
@@ -12,7 +11,9 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView()
+        // Use TextKit 1 explicitly — recomputeAnchorPositions relies on NSLayoutManager,
+        // which is nil under TextKit 2 unless we opt into the legacy stack.
+        let textView = NSTextView(usingTextLayoutManager: false)
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -43,6 +44,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
         textView.textStorage?.setAttributedString(attributedText)
         context.coordinator.viewModel = tocViewModel
+        context.coordinator.resetSuppressionWindow()
         context.coordinator.recomputeAnchorPositions()
     }
 
@@ -85,6 +87,10 @@ struct MarkdownTextView: NSViewRepresentable {
             }
         }
 
+        func resetSuppressionWindow() {
+            suppressScrollSpyUntil = nil
+        }
+
         func recomputeAnchorPositions() {
             guard let textView, let layoutManager = textView.layoutManager,
                   let textContainer = textView.textContainer else {
@@ -96,6 +102,9 @@ struct MarkdownTextView: NSViewRepresentable {
             let inset = textView.textContainerInset.height
 
             anchorYPositions = viewModel.displayableAnchors.map { anchor in
+                // anchor.range has length 0 (positional); expand to 1 so glyphRange has a
+                // non-empty range to resolve. The parser guarantees heading text is non-empty,
+                // so location + 1 is always within bounds.
                 let glyphRange = layoutManager.glyphRange(
                     forCharacterRange: NSRange(location: anchor.range.location, length: 1),
                     actualCharacterRange: nil
