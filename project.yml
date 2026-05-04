@@ -129,6 +129,7 @@ targets:
       - path: MarkdownQuickLookPreviewExtension/MarkdownTextView.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewRootView.swift
       - path: MarkdownQuickLookPreviewExtension/PreviewViewController.swift
+      - path: MarkdownQuickLookPreviewExtension/TableOfContentsSidebar.swift
       - path: MarkdownQuickLookPreviewExtension/TableOfContentsViewModel.swift
       - path: MarkdownQuickLookPreviewExtension/Tests
       - path: MarkdownQuickLookPreviewExtension/PreviewLoadingCoordinator.swift
