@@ -930,7 +930,12 @@ final class MarkdownDocumentRendererTests: XCTestCase {
             .deletingLastPathComponent() // Tests/
             .deletingLastPathComponent() // MarkdownRendering/
             .deletingLastPathComponent() // repo root
-        return repoRoot.appendingPathComponent("Fixtures").appendingPathComponent(filename)
+        let url = repoRoot.appendingPathComponent("Fixtures").appendingPathComponent(filename)
+        precondition(
+            FileManager.default.fileExists(atPath: url.path),
+            "Fixture not found at \(url.path) — did the test file or Fixtures/ directory move?"
+        )
+        return url
     }
 
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
