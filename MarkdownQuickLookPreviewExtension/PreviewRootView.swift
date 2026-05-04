@@ -12,12 +12,14 @@ struct PreviewRootView: View {
             if tocViewModel.shouldShowSidebar {
                 TableOfContentsSidebar(viewModel: tocViewModel)
                     .frame(width: 220)
+                    .transition(.move(edge: .leading))
                 Divider()
             } else if tocViewModel.shouldShowExpandStrip {
                 SidebarExpandStrip {
                     tocViewModel.collapsed = false
                 }
                 .frame(width: 28)
+                .transition(.move(edge: .leading))
                 Divider()
             }
 
