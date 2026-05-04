@@ -5,6 +5,7 @@ struct PreviewRootView: View {
     let title: String
     let message: String?
     let attributedContent: NSAttributedString?
+    @ObservedObject var tocViewModel: TableOfContentsViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -12,7 +13,7 @@ struct PreviewRootView: View {
                 .font(.title2.weight(.semibold))
 
             if let attributedContent {
-                MarkdownTextView(attributedText: attributedContent)
+                MarkdownTextView(attributedText: attributedContent, tocViewModel: tocViewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text(message ?? "No preview available.")

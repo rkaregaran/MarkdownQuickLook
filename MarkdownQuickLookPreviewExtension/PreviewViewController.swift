@@ -11,12 +11,18 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         @escaping @MainActor @Sendable () -> Bool
     ) async throws -> MarkdownRenderPayload
 
-    private let hostingView = NSHostingView(
-        rootView: PreviewRootView(title: "Markdown Preview", message: "Loading preview...", attributedContent: nil)
-    )
     private let loadingCoordinator: PreviewLoadingCoordinator<PreviewLoadResult>
     private let prepareDocumentResultProvider: PrepareDocumentResultProvider
     private let renderProvider: RenderProvider
+    private let tocViewModel = TableOfContentsViewModel()
+    private lazy var hostingView: NSHostingView<PreviewRootView> = NSHostingView(
+        rootView: PreviewRootView(
+            title: "Markdown Preview",
+            message: "Loading preview...",
+            attributedContent: nil,
+            tocViewModel: tocViewModel
+        )
+    )
 
     override init(nibName nibNameOrNil: NSNib.Name? = nil, bundle nibBundleOrNil: Bundle? = nil) {
         loadingCoordinator = PreviewLoadingCoordinator()
@@ -109,13 +115,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
+                tocViewModel.setAnchors(payload.tableOfContents)
                 do {
                     let applyInterval = MarkdownPerformanceInstrumentation.begin("preview.applyView")
                     defer { MarkdownPerformanceInstrumentation.end(applyInterval) }
                     hostingView.rootView = PreviewRootView(
                         title: payload.title,
                         message: nil,
-                        attributedContent: payload.attributedContent
+                        attributedContent: payload.attributedContent,
+                        tocViewModel: tocViewModel
                     )
                     preferredContentSize = PreviewSizing.preferredContentSize(
                         forRenderedText: payload.attributedContent.string
@@ -130,11 +138,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
+                tocViewModel.setAnchors([])
                 MarkdownPerformanceInstrumentation.event("preview.failure")
                 hostingView.rootView = PreviewRootView(
                     title: url.lastPathComponent,
                     message: error.errorDescription,
-                    attributedContent: nil
+                    attributedContent: nil,
+                    tocViewModel: tocViewModel
                 )
                 preferredContentSize = PreviewSizing.errorPreferredContentSize
                 endRequestInterval()
@@ -143,11 +153,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                     MarkdownPerformanceInstrumentation.event("preview.stale")
                     return
                 }
+                tocViewModel.setAnchors([])
                 MarkdownPerformanceInstrumentation.event("preview.failure")
                 hostingView.rootView = PreviewRootView(
                     title: url.lastPathComponent,
                     message: message,
-                    attributedContent: nil
+                    attributedContent: nil,
+                    tocViewModel: tocViewModel
                 )
                 preferredContentSize = PreviewSizing.errorPreferredContentSize
                 endRequestInterval()
@@ -165,7 +177,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         PreviewRootView(
             title: url.lastPathComponent,
             message: "Loading preview...",
-            attributedContent: nil
+            attributedContent: nil,
+            tocViewModel: tocViewModel
         )
     }
 

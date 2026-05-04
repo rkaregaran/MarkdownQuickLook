@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
+    @ObservedObject var tocViewModel: TableOfContentsViewModel
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
