@@ -827,9 +827,46 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(payload.tableOfContents.count, 2)
 
         for anchor in payload.tableOfContents {
-            let snippet = rendered.substring(with: NSRange(location: anchor.range.location, length: anchor.text.count))
-            XCTAssertEqual(snippet, anchor.text, "Anchor for level \(anchor.level) should land on its heading text")
+            let plainHeading: String
+            if let parsed = try? AttributedString(markdown: anchor.text) {
+                plainHeading = String(parsed.characters)
+            } else {
+                plainHeading = anchor.text
+            }
+
+            let location = anchor.range.location
+            XCTAssertLessThanOrEqual(
+                location + plainHeading.count,
+                rendered.length,
+                "Anchor location for level \(anchor.level) is past end of rendered string"
+            )
+
+            let suffix = rendered.substring(from: location)
+            XCTAssertTrue(
+                suffix.hasPrefix(plainHeading),
+                "Rendered string at anchor location for level \(anchor.level) should start with \(plainHeading); got \(suffix.prefix(plainHeading.count))"
+            )
         }
+    }
+
+    func testAsyncRenderEmitsHeadingAnchors() async throws {
+        let url = try temporaryMarkdownFile(
+            """
+            # Async One
+
+            Body text.
+
+            ## Async Two
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let renderer = MarkdownDocumentRenderer()
+        let document = try renderer.prepareDocument(fileAt: url)
+        let payload = try await renderer.render(document: document, shouldContinue: { true })
+
+        XCTAssertEqual(payload.tableOfContents.map(\.level), [1, 2])
+        XCTAssertEqual(payload.tableOfContents.map(\.text), ["Async One", "Async Two"])
     }
 
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
