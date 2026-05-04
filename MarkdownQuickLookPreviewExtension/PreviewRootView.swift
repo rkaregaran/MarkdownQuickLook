@@ -8,6 +8,29 @@ struct PreviewRootView: View {
     @ObservedObject var tocViewModel: TableOfContentsViewModel
 
     var body: some View {
+        HStack(spacing: 0) {
+            if tocViewModel.shouldShowSidebar {
+                TableOfContentsSidebar(viewModel: tocViewModel)
+                    .frame(width: 220)
+                Divider()
+            } else if tocViewModel.shouldShowExpandStrip {
+                SidebarExpandStrip {
+                    tocViewModel.collapsed = false
+                }
+                .frame(width: 28)
+                Divider()
+            }
+
+            contentColumn
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .textBackgroundColor))
+        .animation(.easeInOut(duration: 0.18), value: tocViewModel.shouldShowSidebar)
+        .animation(.easeInOut(duration: 0.18), value: tocViewModel.shouldShowExpandStrip)
+    }
+
+    private var contentColumn: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title)
                 .font(.title2.weight(.semibold))
@@ -22,7 +45,5 @@ struct PreviewRootView: View {
             }
         }
         .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .textBackgroundColor))
     }
 }
