@@ -498,6 +498,57 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertNil(style)
     }
 
+    func testRenderPlainTextWithoutInlineMarkersKeepsBodyAttributes() throws {
+        let payload = try renderDocument("Plain paragraph without inline markers.").payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let fullRange = NSRange(location: 0, length: rendered.length)
+        let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+        let color = rendered.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        let paragraphStyle = rendered.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+
+        XCTAssertEqual(rendered.string, "Plain paragraph without inline markers.")
+        XCTAssertEqual(fullRange.length, rendered.string.count)
+        XCTAssertEqual(font?.pointSize, 15)
+        XCTAssertEqual(color, NSColor.labelColor)
+        XCTAssertEqual(paragraphStyle?.paragraphSpacing, 10)
+    }
+
+    func testRenderPlainTextDashReplacementStillWorksWithoutInlineParsing() throws {
+        let payload = try renderDocument("Before -- middle --- after").payload
+
+        XCTAssertEqual(payload.attributedContent.string, "Before – middle — after")
+    }
+
+    func testRenderDashReplacementDoesNotChangeInlineCode() throws {
+        let payload = try renderDocument("Use `--flag` before --- launch").payload
+
+        XCTAssertEqual(payload.attributedContent.string, "Use --flag before — launch")
+    }
+
+    func testRenderInlineMarkdownFeatureMixAfterFastPath() throws {
+        let payload = try renderDocument("Read [docs](https://example.com), **bold**, *italic*, `code`, and ~~old~~ text.").payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+
+        let docsRange = nsString.range(of: "docs")
+        let boldRange = nsString.range(of: "bold")
+        let italicRange = nsString.range(of: "italic")
+        let codeRange = nsString.range(of: "code")
+        let oldRange = nsString.range(of: "old text")
+
+        let link = rendered.attribute(.link, at: docsRange.location, effectiveRange: nil) as? URL
+        let boldFont = rendered.attribute(.font, at: boldRange.location, effectiveRange: nil) as? NSFont
+        let italicFont = rendered.attribute(.font, at: italicRange.location, effectiveRange: nil) as? NSFont
+        let codeFont = rendered.attribute(.font, at: codeRange.location, effectiveRange: nil) as? NSFont
+        let strike = rendered.attribute(.strikethroughStyle, at: oldRange.location, effectiveRange: nil) as? Int
+
+        XCTAssertEqual(link, URL(string: "https://example.com"))
+        XCTAssertTrue(boldFont?.fontDescriptor.symbolicTraits.contains(.bold) == true)
+        XCTAssertTrue(italicFont?.fontDescriptor.symbolicTraits.contains(.italic) == true)
+        XCTAssertTrue(codeFont?.isFixedPitch == true)
+        XCTAssertEqual(strike, NSUnderlineStyle.single.rawValue)
+    }
+
     func testRenderYAMLFrontMatterIsExtracted() throws {
         let payload = try renderDocument(
             """
