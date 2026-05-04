@@ -134,7 +134,7 @@ Both behaviors require mapping `NSRange` → vertical y-position, which only wor
 ```swift
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
-    @ObservedObject var tocViewModel: TableOfContentsViewModel  // optional via wrapper
+    @ObservedObject var tocViewModel: TableOfContentsViewModel
 
     func makeCoordinator() -> Coordinator
     final class Coordinator: NSObject {
@@ -151,12 +151,14 @@ struct MarkdownTextView: NSViewRepresentable {
 }
 ```
 
+`TableOfContentsViewModel` is always present (never optional). When the document has no displayable headings, the view model's `anchors` array is empty: the sidebar isn't rendered, the coordinator's `recomputeAnchorPositions()` short-circuits, and `boundsDidChange` has nothing to update. This avoids `Optional<ObservedObject>` gymnastics and keeps the wiring uniform.
+
 ### Scroll observer wiring
 
 - In `makeNSView`, after building the `NSScrollView` + `NSTextView`:
   - `scrollView.contentView.postsBoundsChangedNotifications = true`
   - `NotificationCenter.default.addObserver(coordinator, selector: #selector(Coordinator.boundsDidChange(_:)), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)`
-- `tocViewModel.scrollRequest` (a `PassthroughSubject<Int, Never>` or `(Int) -> Void` callback) is bound to `coordinator.scrollToAnchor(at:)`.
+- `TableOfContentsViewModel` exposes a `scrollHandler: ((Int) -> Void)?` property. The coordinator sets it in `makeNSView` to a closure that calls `scrollToAnchor(at:)`. Row taps invoke `viewModel.requestScroll(to: index)`, which calls `scrollHandler?(index)` and updates `activeAnchorIndex` immediately. No Combine import needed.
 - After `updateNSView` rewrites text storage, the coordinator forces layout (`layoutManager.ensureLayout(for: textContainer)`) and recomputes `anchorYPositions` for every anchor in `tocViewModel.anchors`.
 
 ### Activation rule
@@ -205,11 +207,14 @@ The thumbnail extension is unchanged — thumbnails are static images.
 - `MarkdownQuickLookPreviewExtension/PreviewRootView.swift` — replace `VStack` with `HStack` layout; accept the TOC view model
 - `MarkdownQuickLookPreviewExtension/MarkdownTextView.swift` — gain `Coordinator`, scroll observer, programmatic scroll-to-anchor
 - `MarkdownQuickLookPreviewExtension/PreviewViewController.swift` — own a `TableOfContentsViewModel` instance and seed it from each `MarkdownRenderPayload`
-- `project.yml` — list new files in `MarkdownRendering` source globs (covered by existing glob if files land in `Sources/`) and `MarkdownQuickLookPreviewExtension` per-file source list, plus matching test target source lists
+- `project.yml` — `MarkdownRendering` and `MarkdownQuickLookPreviewExtension` use directory-glob source rules, so the new files are picked up automatically. **`MarkdownQuickLookPreviewExtensionTests` lists sources individually**, so add explicit entries:
+  - `MarkdownQuickLookPreviewExtension/TableOfContentsSidebar.swift`
+  - `MarkdownQuickLookPreviewExtension/TableOfContentsViewModel.swift`
+  `MarkdownRenderingTests` uses a directory glob (`MarkdownRendering/Tests`) — new test files there are auto-included.
 
 **Tests added:**
-- `MarkdownRendering/Tests/...` — anchor extraction tests (described below)
-- `MarkdownQuickLookPreviewExtension/Tests/...` — TOC view model and visibility-state-machine tests
+- Extend `MarkdownRendering/Tests/MarkdownDocumentRendererTests.swift` (or add a focused `MarkdownTableOfContentsTests.swift` in the same directory) — anchor extraction tests
+- New `MarkdownQuickLookPreviewExtension/Tests/TableOfContentsViewModelTests.swift` — TOC view model and visibility-state-machine tests
 
 ## Testing strategy
 
