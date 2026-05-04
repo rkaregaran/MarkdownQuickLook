@@ -209,6 +209,25 @@ final class TableOfContentsViewModelTests: XCTestCase {
         XCTAssertEqual(result, 2)
     }
 
+    func testActiveAnchorIndexExactBoundarySelectsThatAnchor() {
+        // cutoff = 76 + 24 = 100; anchor[1] sits exactly at 100, so <= picks it.
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 76,
+            anchorYPositions: [50, 100, 200]
+        )
+        XCTAssertEqual(result, 1)
+    }
+
+    func testActiveAnchorIndexOnePastBoundaryFallsBackToPrevious() {
+        // cutoff = 76 + 24 = 100; anchor[1] at 101 is one past the inclusive threshold,
+        // so anchor[0] still wins. Catches a regression from <= to <.
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 76,
+            anchorYPositions: [50, 101, 200]
+        )
+        XCTAssertEqual(result, 0)
+    }
+
     private func anchor(level: Int, location: Int = 0) -> HeadingAnchor {
         HeadingAnchor(level: level, text: "H\(level)", range: NSRange(location: location, length: 0))
     }
