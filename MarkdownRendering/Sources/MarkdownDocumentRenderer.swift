@@ -56,6 +56,7 @@ public struct MarkdownPreparedDocument: Sendable {
 
 public final class MarkdownDocumentRenderer {
     private let settings: MarkdownRenderSettings
+    private static let inlineMarkdownMarkerCharacters = CharacterSet(charactersIn: "[]()*_`~<>!\\")
 
     public init(settings: MarkdownRenderSettings = .default) {
         self.settings = settings
@@ -653,14 +654,55 @@ public final class MarkdownDocumentRenderer {
         let interval = MarkdownPerformanceInstrumentation.begin("renderer.inlineMarkdown")
         defer { MarkdownPerformanceInstrumentation.end(interval) }
 
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        let parsed = (try? AttributedString(markdown: text, options: options, baseURL: baseURL)) ?? AttributedString(text)
-        let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
-        attributed.addAttributes(baseAttributes, range: NSRange(location: 0, length: attributed.length))
-        applyStrikethrough(to: attributed, from: parsed)
-        applyDashes(to: attributed, from: parsed)
-        applyInlineCodeBackground(to: attributed, from: parsed)
+        let shouldParseInlineMarkdown = requiresInlineMarkdownParsing(text)
+        let shouldReplaceDashes = containsDashReplacementCandidate(text)
+        let shouldApplyStrikethrough = containsStrikethroughCandidate(text)
+        let shouldApplyInlineCode = containsInlineCodeCandidate(text)
+
+        if shouldParseInlineMarkdown {
+            let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            let parsed = (try? AttributedString(markdown: text, options: options, baseURL: baseURL)) ?? AttributedString(text)
+            let attributed = NSMutableAttributedString(attributedString: NSAttributedString(parsed))
+            attributed.addAttributes(baseAttributes, range: NSRange(location: 0, length: attributed.length))
+
+            if shouldApplyStrikethrough {
+                applyStrikethrough(to: attributed, from: parsed)
+            }
+
+            if shouldReplaceDashes {
+                applyDashes(to: attributed, from: parsed)
+            }
+
+            if shouldApplyInlineCode {
+                applyInlineCodeBackground(to: attributed, from: parsed)
+            }
+
+            return attributed
+        }
+
+        let attributed = NSMutableAttributedString(string: text, attributes: baseAttributes)
+
+        if shouldReplaceDashes {
+            applyDashes(to: attributed, skippingCodeRanges: IndexSet())
+        }
+
         return attributed
+    }
+
+    private func requiresInlineMarkdownParsing(_ text: String) -> Bool {
+        text.rangeOfCharacter(from: Self.inlineMarkdownMarkerCharacters) != nil
+    }
+
+    private func containsDashReplacementCandidate(_ text: String) -> Bool {
+        text.contains("--")
+    }
+
+    private func containsInlineCodeCandidate(_ text: String) -> Bool {
+        text.contains("`")
+    }
+
+    private func containsStrikethroughCandidate(_ text: String) -> Bool {
+        text.contains("~~")
     }
 
     private func applyStrikethrough(to attributed: NSMutableAttributedString, from source: AttributedString) {
@@ -672,7 +714,6 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func applyDashes(to attributed: NSMutableAttributedString, from source: AttributedString) {
-        // Build a set of code ranges to skip.
         var codeRanges = IndexSet()
         for run in source.runs {
             if let intent = run.inlinePresentationIntent, intent.contains(.code) {
@@ -681,7 +722,11 @@ public final class MarkdownDocumentRenderer {
             }
         }
 
-        // Replace --- with em dash first (longer match first), then -- with en dash.
+        applyDashes(to: attributed, skippingCodeRanges: codeRanges)
+    }
+
+    private func applyDashes(to attributed: NSMutableAttributedString, skippingCodeRanges initialCodeRanges: IndexSet) {
+        var codeRanges = initialCodeRanges
         let replacements: [(pattern: String, replacement: String)] = [
             ("---", "\u{2014}"),
             ("--", "\u{2013}")
