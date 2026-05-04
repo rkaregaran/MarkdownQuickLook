@@ -869,6 +869,70 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(payload.tableOfContents.map(\.text), ["Async One", "Async Two"])
     }
 
+    func testTableOfContentsForSampleFixture() throws {
+        let fixtureURL = sampleFixtureURL(named: "Sample.md")
+        let payload = try MarkdownDocumentRenderer().render(fileAt: fixtureURL)
+
+        let levels = payload.tableOfContents.map(\.level)
+        let texts = payload.tableOfContents.map(\.text)
+
+        XCTAssertEqual(levels, [1, 2, 2, 2, 2, 2])
+        XCTAssertEqual(
+            texts,
+            [
+                "Markdown Quick Look",
+                "Checklist",
+                "Features",
+                "Ordered Steps",
+                "Nested Lists",
+                "Image Test"
+            ]
+        )
+
+        let rendered = payload.attributedContent.string as NSString
+        for anchor in payload.tableOfContents {
+            let plainHeading: String
+            if let parsed = try? AttributedString(markdown: anchor.text) {
+                plainHeading = String(parsed.characters)
+            } else {
+                plainHeading = anchor.text
+            }
+
+            XCTAssertLessThanOrEqual(
+                anchor.range.location + plainHeading.count,
+                rendered.length,
+                "Anchor location for level \(anchor.level) is past end of rendered string"
+            )
+
+            let suffix = rendered.substring(from: anchor.range.location)
+            XCTAssertTrue(
+                suffix.hasPrefix(plainHeading),
+                "Rendered string at anchor location for level \(anchor.level) should start with \(plainHeading)"
+            )
+        }
+    }
+
+    func testTableOfContentsForShowcaseFixture() throws {
+        let fixtureURL = sampleFixtureURL(named: "Showcase.md")
+        let payload = try MarkdownDocumentRenderer().render(fileAt: fixtureURL)
+
+        XCTAssertEqual(payload.tableOfContents.count, 5)
+        XCTAssertEqual(payload.tableOfContents.first?.level, 1)
+        XCTAssertEqual(
+            payload.tableOfContents.dropFirst().map(\.level),
+            [2, 2, 2, 2]
+        )
+    }
+
+    private func sampleFixtureURL(named filename: String, file: StaticString = #filePath) -> URL {
+        let testFile = URL(fileURLWithPath: String(describing: file))
+        let repoRoot = testFile
+            .deletingLastPathComponent() // Tests/
+            .deletingLastPathComponent() // MarkdownRendering/
+            .deletingLastPathComponent() // repo root
+        return repoRoot.appendingPathComponent("Fixtures").appendingPathComponent(filename)
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
