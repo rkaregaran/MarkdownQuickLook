@@ -4,10 +4,16 @@ import Foundation
 public struct MarkdownRenderPayload {
     public let title: String
     public let attributedContent: NSAttributedString
+    public let tableOfContents: [HeadingAnchor]
 
-    public init(title: String, attributedContent: NSAttributedString) {
+    public init(
+        title: String,
+        attributedContent: NSAttributedString,
+        tableOfContents: [HeadingAnchor] = []
+    ) {
         self.title = title
         self.attributedContent = attributedContent
+        self.tableOfContents = tableOfContents
     }
 }
 

@@ -762,6 +762,11 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(text.contains("let x = 1"))
     }
 
+    func testRenderEmitsEmptyTableOfContentsForDocumentWithoutHeadings() throws {
+        let payload = try renderDocument("Just a paragraph, no headings here.").payload
+        XCTAssertEqual(payload.tableOfContents, [])
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
