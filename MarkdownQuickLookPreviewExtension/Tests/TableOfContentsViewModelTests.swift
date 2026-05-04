@@ -168,6 +168,47 @@ final class TableOfContentsViewModelTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: TableOfContentsViewModel.collapsedDefaultsKey))
     }
 
+    func testActiveAnchorIndexIsNilForEmptyAnchors() {
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 0,
+            anchorYPositions: []
+        )
+        XCTAssertNil(result)
+    }
+
+    func testActiveAnchorIndexHighlightsFirstWhenScrolledAboveAllAnchors() {
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 0,
+            anchorYPositions: [100, 200, 300]
+        )
+        XCTAssertEqual(result, 0)
+    }
+
+    func testActiveAnchorIndexPicksLastAnchorAtOrAboveThreshold() {
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 250,
+            anchorYPositions: [100, 200, 300]
+        )
+        XCTAssertEqual(result, 1)
+    }
+
+    func testActiveAnchorIndexUsesActivationOffset() {
+        // visibleTop = 90, threshold = 90 + 24 = 114; anchor at 100 is "current".
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 90,
+            anchorYPositions: [100, 300]
+        )
+        XCTAssertEqual(result, 0)
+    }
+
+    func testActiveAnchorIndexPastLastAnchorPicksLast() {
+        let result = TableOfContentsViewModel.computeActiveAnchorIndex(
+            visibleTop: 9_999,
+            anchorYPositions: [100, 200, 300]
+        )
+        XCTAssertEqual(result, 2)
+    }
+
     private func anchor(level: Int, location: Int = 0) -> HeadingAnchor {
         HeadingAnchor(level: level, text: "H\(level)", range: NSRange(location: location, length: 0))
     }

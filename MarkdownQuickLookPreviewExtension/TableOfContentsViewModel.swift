@@ -46,4 +46,19 @@ final class TableOfContentsViewModel: ObservableObject {
         activeAnchorIndex = displayIndex
         scrollHandler?(displayIndex)
     }
+
+    static let activationOffset: CGFloat = 24
+
+    static func computeActiveAnchorIndex(
+        visibleTop: CGFloat,
+        anchorYPositions: [CGFloat],
+        activationOffset: CGFloat = TableOfContentsViewModel.activationOffset
+    ) -> Int? {
+        guard anchorYPositions.isEmpty == false else { return nil }
+        let cutoff = visibleTop + activationOffset
+        if let lastBelow = anchorYPositions.lastIndex(where: { $0 <= cutoff }) {
+            return lastBelow
+        }
+        return 0
+    }
 }
