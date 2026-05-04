@@ -767,6 +767,71 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(payload.tableOfContents, [])
     }
 
+    func testRenderEmitsAnchorForEachHeadingInDocumentOrder() throws {
+        let payload = try renderDocument(
+            """
+            # Top level
+            Body.
+
+            ## Second
+            More body.
+
+            ### Third
+            Final body.
+            """
+        ).payload
+
+        XCTAssertEqual(payload.tableOfContents.map(\.level), [1, 2, 3])
+        XCTAssertEqual(payload.tableOfContents.map(\.text), ["Top level", "Second", "Third"])
+
+        let locations = payload.tableOfContents.map(\.range.location)
+        XCTAssertEqual(locations, locations.sorted(), "Anchors must be in document order")
+    }
+
+    func testRenderEmitsAllSixHeadingLevels() throws {
+        let payload = try renderDocument(
+            """
+            # H1
+
+            ## H2
+
+            ### H3
+
+            #### H4
+
+            ##### H5
+
+            ###### H6
+            """
+        ).payload
+
+        XCTAssertEqual(payload.tableOfContents.map(\.level), [1, 2, 3, 4, 5, 6])
+    }
+
+    func testRenderAnchorRangeMatchesHeadingPositionInRenderedString() throws {
+        let payload = try renderDocument(
+            """
+            Intro paragraph.
+
+            # First Heading
+
+            Some body text after the heading.
+
+            ## Second Heading
+
+            More text.
+            """
+        ).payload
+
+        let rendered = payload.attributedContent.string as NSString
+        XCTAssertEqual(payload.tableOfContents.count, 2)
+
+        for anchor in payload.tableOfContents {
+            let snippet = rendered.substring(with: NSRange(location: anchor.range.location, length: anchor.text.count))
+            XCTAssertEqual(snippet, anchor.text, "Anchor for level \(anchor.level) should land on its heading text")
+        }
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

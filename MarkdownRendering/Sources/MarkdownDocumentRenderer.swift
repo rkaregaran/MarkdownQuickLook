@@ -119,11 +119,21 @@ public final class MarkdownDocumentRenderer {
         defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
 
         let formatted = NSMutableAttributedString()
+        var anchors: [HeadingAnchor] = []
         #if DEBUG
         var blockCounts: [String: Int] = [:]
         #endif
 
         for (index, block) in document.blocks.enumerated() {
+            if case .heading(let level, let text) = block {
+                anchors.append(
+                    HeadingAnchor(
+                        level: level,
+                        text: text,
+                        range: NSRange(location: formatted.length, length: 0)
+                    )
+                )
+            }
             #if DEBUG
             recordRenderedBlock(block, counts: &blockCounts)
             #endif
@@ -142,7 +152,8 @@ public final class MarkdownDocumentRenderer {
 
         return MarkdownRenderPayload(
             title: document.title,
-            attributedContent: NSAttributedString(attributedString: formatted)
+            attributedContent: NSAttributedString(attributedString: formatted),
+            tableOfContents: anchors
         )
     }
 
@@ -155,12 +166,22 @@ public final class MarkdownDocumentRenderer {
         defer { MarkdownPerformanceInstrumentation.end(renderInterval) }
 
         let formatted = NSMutableAttributedString()
+        var anchors: [HeadingAnchor] = []
         #if DEBUG
         var blockCounts: [String: Int] = [:]
         #endif
 
         for (index, block) in document.blocks.enumerated() {
             try ensureRenderingCanContinue(shouldContinue)
+            if case .heading(let level, let text) = block {
+                anchors.append(
+                    HeadingAnchor(
+                        level: level,
+                        text: text,
+                        range: NSRange(location: formatted.length, length: 0)
+                    )
+                )
+            }
             #if DEBUG
             recordRenderedBlock(block, counts: &blockCounts)
             #endif
@@ -182,7 +203,8 @@ public final class MarkdownDocumentRenderer {
 
         return MarkdownRenderPayload(
             title: document.title,
-            attributedContent: NSAttributedString(attributedString: formatted)
+            attributedContent: NSAttributedString(attributedString: formatted),
+            tableOfContents: anchors
         )
     }
 
