@@ -110,6 +110,35 @@ final class TableOfContentsViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.activeAnchorIndex)
     }
 
+    func testCollapsedFlagPersistsThroughInjectedDefaults() {
+        let suite = "test.toc.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            return XCTFail("Failed to create test UserDefaults suite")
+        }
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let first = TableOfContentsViewModel(defaults: defaults)
+        first.collapsed = true
+
+        let second = TableOfContentsViewModel(defaults: defaults)
+        XCTAssertTrue(second.collapsed)
+    }
+
+    func testCollapsedFlagDefaultsToFalseInFreshDefaults() {
+        let suite = "test.toc.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            return XCTFail("Failed to create test UserDefaults suite")
+        }
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let viewModel = TableOfContentsViewModel(defaults: defaults)
+        XCTAssertFalse(viewModel.collapsed)
+    }
+
     private func anchor(level: Int, location: Int = 0) -> HeadingAnchor {
         HeadingAnchor(level: level, text: "H\(level)", range: NSRange(location: location, length: 0))
     }
