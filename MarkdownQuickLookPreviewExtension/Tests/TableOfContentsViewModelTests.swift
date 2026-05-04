@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class TableOfContentsViewModelTests: XCTestCase {
-    func testDisplayableAnchorsFiltersToHThreeAndAbove() {
+    func testDisplayableAnchorsKeepsLevelsOneThroughThree() {
         let viewModel = TableOfContentsViewModel()
         viewModel.setAnchors([
             anchor(level: 1),
@@ -86,6 +86,27 @@ final class TableOfContentsViewModelTests: XCTestCase {
         viewModel.requestScroll(to: 5)
 
         XCTAssertEqual(handlerCalls, 0)
+        XCTAssertNil(viewModel.activeAnchorIndex)
+    }
+
+    func testRequestScrollWithNilHandlerStillUpdatesActiveIndex() {
+        let viewModel = TableOfContentsViewModel()
+        viewModel.setAnchors([anchor(level: 1), anchor(level: 2)])
+
+        XCTAssertNil(viewModel.scrollHandler)
+        viewModel.requestScroll(to: 1)
+
+        XCTAssertEqual(viewModel.activeAnchorIndex, 1)
+    }
+
+    func testSetAnchorsClearsActiveIndexAtEqualBoundary() {
+        let viewModel = TableOfContentsViewModel()
+        viewModel.setAnchors([anchor(level: 1), anchor(level: 2)])
+        viewModel.activeAnchorIndex = 1
+
+        // Shrink so previous active index (1) equals new count (1) -> first out-of-bounds.
+        viewModel.setAnchors([anchor(level: 1)])
+
         XCTAssertNil(viewModel.activeAnchorIndex)
     }
 

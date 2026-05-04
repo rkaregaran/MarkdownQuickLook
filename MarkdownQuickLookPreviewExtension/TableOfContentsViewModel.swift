@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import MarkdownRendering
 
+@MainActor
 final class TableOfContentsViewModel: ObservableObject {
     @Published private(set) var displayableAnchors: [HeadingAnchor] = []
     @Published var activeAnchorIndex: Int?
