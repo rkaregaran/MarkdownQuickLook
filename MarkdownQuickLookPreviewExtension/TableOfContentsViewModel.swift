@@ -26,6 +26,7 @@ final class TableOfContentsViewModel: ObservableObject {
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        defaults.synchronize()
         self.collapsed = defaults.bool(forKey: Self.collapsedDefaultsKey)
     }
 

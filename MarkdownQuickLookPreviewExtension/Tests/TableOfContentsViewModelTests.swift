@@ -33,7 +33,15 @@ final class TableOfContentsViewModelTests: XCTestCase {
     }
 
     func testVisibilityWhenExpandedAndCollapsed() {
-        let viewModel = TableOfContentsViewModel()
+        let suite = "test.toc.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            return XCTFail("Failed to create test UserDefaults suite")
+        }
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let viewModel = TableOfContentsViewModel(defaults: defaults)
         viewModel.setAnchors([anchor(level: 1), anchor(level: 2)])
 
         XCTAssertTrue(viewModel.shouldShowSidebar)
@@ -137,6 +145,27 @@ final class TableOfContentsViewModelTests: XCTestCase {
 
         let viewModel = TableOfContentsViewModel(defaults: defaults)
         XCTAssertFalse(viewModel.collapsed)
+    }
+
+    func testCollapsedNoOpAssignmentDoesNotOverwriteDefaults() {
+        let suite = "test.toc.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            return XCTFail("Failed to create test UserDefaults suite")
+        }
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let viewModel = TableOfContentsViewModel(defaults: defaults)
+        XCTAssertFalse(viewModel.collapsed)
+
+        // Inject a value out-of-band that disagrees with the view model's in-memory state,
+        // then assign the same value the view model already holds. The didSet guard
+        // should short-circuit so the out-of-band value is preserved.
+        defaults.set(true, forKey: TableOfContentsViewModel.collapsedDefaultsKey)
+        viewModel.collapsed = false
+
+        XCTAssertTrue(defaults.bool(forKey: TableOfContentsViewModel.collapsedDefaultsKey))
     }
 
     private func anchor(level: Int, location: Int = 0) -> HeadingAnchor {
