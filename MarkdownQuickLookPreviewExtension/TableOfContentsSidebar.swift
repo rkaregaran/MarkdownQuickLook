@@ -30,6 +30,7 @@ struct TableOfContentsSidebar: View {
             }
             .buttonStyle(.plain)
             .help("Hide table of contents")
+            .accessibilityLabel("Hide table of contents")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -59,6 +60,18 @@ private struct TableOfContentsRow: View {
 
     @State private var isHovering = false
 
+    private let displayText: AttributedString
+    private let tooltipText: String
+
+    init(anchor: HeadingAnchor, isActive: Bool, action: @escaping () -> Void) {
+        self.anchor = anchor
+        self.isActive = isActive
+        self.action = action
+        let computed = Self.computeDisplayText(for: anchor.text)
+        self.displayText = computed.display
+        self.tooltipText = computed.tooltip
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -79,7 +92,7 @@ private struct TableOfContentsRow: View {
             .background(isHovering ? Color.primary.opacity(0.06) : Color.clear)
         }
         .buttonStyle(.plain)
-        .help(anchor.text)
+        .help(tooltipText)
         .onHover { isHovering = $0 }
     }
 
@@ -87,11 +100,14 @@ private struct TableOfContentsRow: View {
         CGFloat(max(anchor.level - 1, 0)) * 12
     }
 
-    private var displayText: AttributedString {
-        if let parsed = try? AttributedString(markdown: anchor.text) {
-            return parsed
+    private static func computeDisplayText(for raw: String) -> (display: AttributedString, tooltip: String) {
+        guard var parsed = try? AttributedString(markdown: raw) else {
+            return (AttributedString(raw), raw)
         }
-        return AttributedString(anchor.text)
+        // Strip link attributes so the enclosing Button action isn't intercepted
+        // by SwiftUI's link-handling on the link-attributed text run.
+        parsed.link = nil
+        return (parsed, String(parsed.characters))
     }
 }
 
@@ -108,6 +124,7 @@ struct SidebarExpandStrip: View {
             .buttonStyle(.plain)
             .padding(.top, 12)
             .help("Show table of contents")
+            .accessibilityLabel("Show table of contents")
             Spacer()
         }
         .frame(maxHeight: .infinity)
