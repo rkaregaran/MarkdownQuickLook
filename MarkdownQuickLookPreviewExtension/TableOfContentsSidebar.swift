@@ -21,16 +21,6 @@ struct TableOfContentsSidebar: View {
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
             Spacer()
-            Button {
-                viewModel.collapsed = true
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Hide table of contents")
-            .accessibilityLabel("Hide table of contents")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -108,26 +98,5 @@ private struct TableOfContentsRow: View {
         // by SwiftUI's link-handling on the link-attributed text run.
         parsed.link = nil
         return (parsed, String(parsed.characters))
-    }
-}
-
-struct SidebarExpandStrip: View {
-    let action: () -> Void
-
-    var body: some View {
-        VStack {
-            Button(action: action) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-            .help("Show table of contents")
-            .accessibilityLabel("Show table of contents")
-            Spacer()
-        }
-        .frame(maxHeight: .infinity)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.6))
     }
 }

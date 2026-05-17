@@ -12,14 +12,8 @@ struct PreviewRootView: View {
             if tocViewModel.shouldShowSidebar {
                 TableOfContentsSidebar(viewModel: tocViewModel)
                     .frame(width: 220)
+                    .background(.regularMaterial)
                     .transition(.move(edge: .leading))
-                Divider()
-            } else if tocViewModel.shouldShowExpandStrip {
-                SidebarExpandStrip {
-                    tocViewModel.collapsed = false
-                }
-                .frame(width: 28)
-                .transition(.move(edge: .leading))
                 Divider()
             }
 
@@ -29,7 +23,6 @@ struct PreviewRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .textBackgroundColor))
         .animation(.easeInOut(duration: 0.18), value: tocViewModel.shouldShowSidebar)
-        .animation(.easeInOut(duration: 0.18), value: tocViewModel.shouldShowExpandStrip)
     }
 
     private var contentColumn: some View {
