@@ -5,30 +5,8 @@ struct TableOfContentsSidebar: View {
     @ObservedObject var viewModel: TableOfContentsViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-            list
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.6))
-    }
-
-    private var header: some View {
-        HStack {
-            Text("Contents")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
-
-    private var list: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(viewModel.displayableAnchors.enumerated()), id: \.offset) { index, anchor in
                     TableOfContentsRow(
                         anchor: anchor,
@@ -38,7 +16,7 @@ struct TableOfContentsSidebar: View {
                     }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
         }
     }
 }
@@ -64,24 +42,20 @@ private struct TableOfContentsRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                Rectangle()
-                    .fill(isActive ? Color.accentColor : Color.clear)
-                    .frame(width: 3)
-                Text(displayText)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                    .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                    .padding(.leading, indent)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-            .padding(.trailing, 8)
-            .contentShape(Rectangle())
-            .background(isHovering ? Color.primary.opacity(0.06) : Color.clear)
+            Text(displayText)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+                .foregroundStyle(textColor)
+                .padding(.leading, indent)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .background(backgroundFill)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, 6)
         .help(tooltipText)
         .onHover { isHovering = $0 }
     }
@@ -90,12 +64,21 @@ private struct TableOfContentsRow: View {
         CGFloat(max(anchor.level - 1, 0)) * 12
     }
 
+    private var textColor: Color {
+        if isActive { return .white }
+        return .secondary
+    }
+
+    private var backgroundFill: Color {
+        if isActive { return Color.accentColor }
+        if isHovering { return Color.primary.opacity(0.05) }
+        return .clear
+    }
+
     private static func computeDisplayText(for raw: String) -> (display: AttributedString, tooltip: String) {
         guard var parsed = try? AttributedString(markdown: raw) else {
             return (AttributedString(raw), raw)
         }
-        // Strip link attributes so the enclosing Button action isn't intercepted
-        // by SwiftUI's link-handling on the link-attributed text run.
         parsed.link = nil
         return (parsed, String(parsed.characters))
     }
