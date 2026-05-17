@@ -33,6 +33,7 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
 
+        context.coordinator.lastAttributedText = attributedText
         context.coordinator.attach(scrollView: scrollView, textView: textView)
         return scrollView
     }
@@ -42,10 +43,19 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
-        textView.textStorage?.setAttributedString(attributedText)
         context.coordinator.viewModel = tocViewModel
-        context.coordinator.resetSuppressionWindow()
-        context.coordinator.recomputeAnchorPositions()
+
+        // Only rebuild text storage and anchor positions when the attributed
+        // content actually changes. SwiftUI calls updateNSView on every observed
+        // state change (scroll-spy active index, hover state, etc.); blindly
+        // replacing the text storage would invalidate layout and reset the
+        // scroll position mid-interaction.
+        if context.coordinator.lastAttributedText !== attributedText {
+            textView.textStorage?.setAttributedString(attributedText)
+            context.coordinator.lastAttributedText = attributedText
+            context.coordinator.resetSuppressionWindow()
+            context.coordinator.scheduleAnchorRecompute()
+        }
     }
 
     @MainActor
@@ -55,6 +65,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
         weak var scrollView: NSScrollView?
         weak var textView: NSTextView?
+        var lastAttributedText: NSAttributedString?
         private(set) var anchorYPositions: [CGFloat] = []
         private var suppressScrollSpyUntil: Date?
 
@@ -81,14 +92,21 @@ struct MarkdownTextView: NSViewRepresentable {
             )
 
             // Initial layout pass so anchor positions are available immediately.
-            DispatchQueue.main.async { [weak self] in
-                self?.recomputeAnchorPositions()
-                self?.updateActiveAnchor()
-            }
+            scheduleAnchorRecompute()
         }
 
         func resetSuppressionWindow() {
             suppressScrollSpyUntil = nil
+        }
+
+        /// Defer the recompute by one runloop tick so SwiftUI has a chance to lay out
+        /// the hosting view and set the text container's width. Computing positions
+        /// while the container width is still 0 produces wildly wrong values.
+        func scheduleAnchorRecompute() {
+            DispatchQueue.main.async { [weak self] in
+                self?.recomputeAnchorPositions()
+                self?.updateActiveAnchor()
+            }
         }
 
         func recomputeAnchorPositions() {
@@ -142,13 +160,13 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         private func scrollToAnchor(at index: Int) {
-            guard let scrollView,
-                  anchorYPositions.indices.contains(index) else { return }
+            guard let textView,
+                  viewModel.displayableAnchors.indices.contains(index) else { return }
 
-            let targetY = max(0, anchorYPositions[index] - 8)
+            let anchor = viewModel.displayableAnchors[index]
+            let charRange = NSRange(location: anchor.range.location, length: 1)
             suppressScrollSpyUntil = Date().addingTimeInterval(0.2)
-            scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
-            scrollView.reflectScrolledClipView(scrollView.contentView)
+            textView.scrollRangeToVisible(charRange)
         }
     }
 }
