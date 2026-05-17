@@ -65,13 +65,16 @@ private struct TableOfContentsRow: View {
     }
 
     private var textColor: Color {
-        if isActive { return .white }
+        // alternateSelectedControlTextColor is the AppKit semantic for "text on top of
+        // a selected control" — it resolves to white for the default blue accent and
+        // adapts for pale accents (yellow/green) where white would have poor contrast.
+        if isActive { return Color(nsColor: .alternateSelectedControlTextColor) }
         return .secondary
     }
 
     private var backgroundFill: Color {
         if isActive { return Color.accentColor }
-        if isHovering { return Color.primary.opacity(0.05) }
+        if isHovering { return Color.primary.opacity(0.08) }
         return .clear
     }
 
@@ -79,6 +82,8 @@ private struct TableOfContentsRow: View {
         guard var parsed = try? AttributedString(markdown: raw) else {
             return (AttributedString(raw), raw)
         }
+        // Strip link attributes so the enclosing Button action isn't intercepted
+        // by SwiftUI's link-handling on the link-attributed text run.
         parsed.link = nil
         return (parsed, String(parsed.characters))
     }
