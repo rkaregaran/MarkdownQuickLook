@@ -16,28 +16,34 @@ final class TableOfContentsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.displayableAnchors.map(\.level), [1, 2, 3])
     }
 
-    func testShouldShowSidebarForEmptyHeadings() {
-        let viewModel = TableOfContentsViewModel()
+    func testShouldShowSidebarStaysFalseWhenFeatureFlagDisabled() {
+        let viewModel = TableOfContentsViewModel(featureEnabled: false)
+        viewModel.setAnchors(Array(repeating: anchor(level: 2), count: 20))
+        XCTAssertFalse(viewModel.shouldShowSidebar, "Flag off must override any heading count")
+    }
+
+    func testShouldShowSidebarForEmptyHeadingsWithFlagEnabled() {
+        let viewModel = TableOfContentsViewModel(featureEnabled: true)
         viewModel.setAnchors([])
         XCTAssertFalse(viewModel.shouldShowSidebar)
     }
 
-    func testShouldShowSidebarForSingleHeading() {
-        let viewModel = TableOfContentsViewModel()
-        viewModel.setAnchors([anchor(level: 1)])
-        XCTAssertFalse(viewModel.shouldShowSidebar)
+    func testShouldShowSidebarForNineHeadingsWithFlagEnabled() {
+        let viewModel = TableOfContentsViewModel(featureEnabled: true)
+        viewModel.setAnchors(Array(repeating: anchor(level: 2), count: 9))
+        XCTAssertFalse(viewModel.shouldShowSidebar, "Below threshold (9 < 10)")
     }
 
-    func testShouldShowSidebarFlipsAtTwoDisplayableHeadings() {
-        let viewModel = TableOfContentsViewModel()
-        viewModel.setAnchors([anchor(level: 1), anchor(level: 2)])
-        XCTAssertTrue(viewModel.shouldShowSidebar)
+    func testShouldShowSidebarFlipsAtTenDisplayableHeadingsWithFlagEnabled() {
+        let viewModel = TableOfContentsViewModel(featureEnabled: true)
+        viewModel.setAnchors(Array(repeating: anchor(level: 2), count: 10))
+        XCTAssertTrue(viewModel.shouldShowSidebar, "At threshold (10 >= 10)")
     }
 
-    func testShouldShowSidebarIgnoresLevelsBelowThree() {
-        let viewModel = TableOfContentsViewModel()
-        viewModel.setAnchors([anchor(level: 4), anchor(level: 5), anchor(level: 6)])
-        XCTAssertFalse(viewModel.shouldShowSidebar)
+    func testShouldShowSidebarIgnoresLevelsBelowThreeWithFlagEnabled() {
+        let viewModel = TableOfContentsViewModel(featureEnabled: true)
+        viewModel.setAnchors(Array(repeating: anchor(level: 4), count: 20))
+        XCTAssertFalse(viewModel.shouldShowSidebar, "h4+ are filtered out of displayableAnchors")
     }
 
     func testActiveAnchorIndexClampsWhenAnchorsShrink() {

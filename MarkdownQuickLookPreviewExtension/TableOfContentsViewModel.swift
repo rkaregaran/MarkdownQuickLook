@@ -4,12 +4,33 @@ import MarkdownRendering
 
 @MainActor
 final class TableOfContentsViewModel: ObservableObject {
+    /// App Group `UserDefaults` key. Sidebar is hidden unless this is set to true.
+    /// Toggle from the CLI:
+    ///   defaults write group.com.rzkr.MarkdownQuickLook tableOfContentsSidebarEnabled -bool true
+    static let featureFlagKey = "tableOfContentsSidebarEnabled"
+
+    /// Minimum displayable (h1–h3) heading count before the sidebar auto-shows.
+    static let headingThreshold = 10
+
     @Published private(set) var displayableAnchors: [HeadingAnchor] = []
     @Published var activeAnchorIndex: Int?
 
     var scrollHandler: ((Int) -> Void)?
 
-    var shouldShowSidebar: Bool { displayableAnchors.count >= 2 }
+    private let featureEnabled: Bool
+
+    convenience init() {
+        let defaults = UserDefaults(suiteName: MarkdownSettingsStore.suiteName) ?? .standard
+        self.init(featureEnabled: defaults.bool(forKey: Self.featureFlagKey))
+    }
+
+    init(featureEnabled: Bool) {
+        self.featureEnabled = featureEnabled
+    }
+
+    var shouldShowSidebar: Bool {
+        featureEnabled && displayableAnchors.count >= Self.headingThreshold
+    }
 
     func setAnchors(_ anchors: [HeadingAnchor]) {
         displayableAnchors = anchors.filter { $0.level <= 3 }

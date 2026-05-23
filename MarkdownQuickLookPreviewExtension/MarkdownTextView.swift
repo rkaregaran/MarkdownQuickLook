@@ -160,13 +160,29 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         private func scrollToAnchor(at index: Int) {
-            guard let textView,
+            guard let textView, let scrollView,
+                  let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer,
                   viewModel.displayableAnchors.indices.contains(index) else { return }
 
             let anchor = viewModel.displayableAnchors[index]
-            let charRange = NSRange(location: anchor.range.location, length: 1)
+            // Force layout so glyph positions are current. At click time the text view
+            // is on screen, so layout is well-defined here (unlike the initial setup
+            // path where the view may not yet have its real frame).
+            layoutManager.ensureLayout(for: textContainer)
+
+            // Use lineFragmentRect — gives the line's rect in text container coords.
+            // Convert to text view bounds by adding the top container inset.
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: anchor.range.location)
+            let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            let viewY = lineRect.origin.y + textView.textContainerInset.height
+
+            // Aim 8pt below the visible top so the heading isn't flush against the edge.
+            let targetY = max(0, viewY - 8)
+
             suppressScrollSpyUntil = Date().addingTimeInterval(0.2)
-            textView.scrollRangeToVisible(charRange)
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
 }
