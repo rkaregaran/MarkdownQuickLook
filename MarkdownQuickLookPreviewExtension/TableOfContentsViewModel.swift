@@ -7,6 +7,8 @@ final class TableOfContentsViewModel: ObservableObject {
     /// App Group `UserDefaults` key. Sidebar is hidden unless this is set to true.
     /// Toggle from the CLI:
     ///   defaults write group.com.rzkr.MarkdownQuickLook tableOfContentsSidebarEnabled -bool true
+    /// Quick Look caches the extension process, so changes take effect only after
+    /// `qlmanage -r && qlmanage -r cache` (or restarting Finder).
     static let featureFlagKey = "tableOfContentsSidebarEnabled"
 
     /// Minimum displayable (h1–h3) heading count before the sidebar auto-shows.

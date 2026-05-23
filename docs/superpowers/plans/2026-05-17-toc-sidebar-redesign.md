@@ -546,12 +546,15 @@ It should point to `/Users/rzkr/Documents/Code/MarkdownQuickLook/.derivedData/..
 
 - [ ] **Step 3: Manual fixture checks**
 
+> **Post-redesign addendum (2026-05-23):** After this plan was written, two follow-up requirements were added based on testing: (a) the sidebar is now gated behind an App Group `UserDefaults` flag (`tableOfContentsSidebarEnabled`, default `false`) — enable with `defaults write group.com.rzkr.MarkdownQuickLook tableOfContentsSidebarEnabled -bool true`, and (b) the auto-show heading threshold was raised from 2 to 10. With those changes, the original fixtures (`Sample.md` with 6 headings, `Showcase.md` with 5) **no longer trigger the sidebar**. Use `/tmp/toc-big-doc.md` (17 headings) or any markdown file with at least 10 h1–h3 headings to exercise the sidebar. Restart Quick Look after toggling the flag (`qlmanage -r && qlmanage -r cache`).
+
 Open each fixture via `qlmanage -p <path>` in the background, eyeball the sidebar, then close with Esc:
 
-- `Fixtures/Sample.md` — has 6 displayable headings. **Expected:** sidebar shows on left with vibrancy background. No "CONTENTS" label, no chevron. Rows render as pills with 6pt horizontal margin from sidebar edge. First row ("Markdown Quick Look") is highlighted with full system-accent-color fill and white semibold text. Scrolling the body updates the highlighted row.
-- `Fixtures/Showcase.md` — same expectations, 5 displayable headings.
-- A file with 0 or 1 headings (any short markdown file you can create) — **Expected:** no sidebar at all; content fills the whole preview.
-- Click any row in `Sample.md` — body scrolls so the heading is in view. The clicked row's highlight stays until you scroll.
+- A markdown doc with ≥10 displayable headings (e.g. `/tmp/toc-big-doc.md`) — **Expected:** sidebar shows on left with vibrancy background. No "CONTENTS" label, no chevron. Rows render as pills with 6pt horizontal margin from sidebar edge. First row is highlighted with full system-accent-color fill and white semibold text. Scrolling the body updates the highlighted row.
+- `Fixtures/Sample.md` — **Expected with current threshold:** no sidebar (6 < 10).
+- `Fixtures/Showcase.md` — **Expected with current threshold:** no sidebar (5 < 10).
+- A file with 0 or 1 headings — **Expected:** no sidebar at all; content fills the whole preview.
+- Click any row in the big doc — body scrolls so the heading lands ~8pt below the visible top. The clicked row's highlight stays until you scroll.
 - Hover over an inactive row — faint gray fill appears, fades when you move the cursor away.
 - Hover over the active row — the row stays accent-tinted, hover gray does NOT override.
 

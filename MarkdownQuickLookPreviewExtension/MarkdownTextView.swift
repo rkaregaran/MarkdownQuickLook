@@ -2,6 +2,11 @@ import AppKit
 import MarkdownRendering
 import SwiftUI
 
+/// Requires TextKit 1 (the legacy `NSLayoutManager` stack). The Coordinator's
+/// scroll-spy and click-to-scroll both call into `NSLayoutManager`, which is
+/// `nil` under TextKit 2. Do not switch `makeNSView` to the default
+/// `NSTextView()` initializer — use `NSTextView(usingTextLayoutManager: false)`
+/// so the legacy stack is in place.
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
     @ObservedObject var tocViewModel: TableOfContentsViewModel
