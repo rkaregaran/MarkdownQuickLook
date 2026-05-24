@@ -31,11 +31,36 @@ public enum MarkdownDocumentRendererError: Error, Equatable, LocalizedError, Sen
     }
 }
 
+enum MarkdownAlertKind: String, Sendable {
+    case note, tip, important, warning, caution
+
+    var displayTitle: String {
+        switch self {
+        case .note: return "Note"
+        case .tip: return "Tip"
+        case .important: return "Important"
+        case .warning: return "Warning"
+        case .caution: return "Caution"
+        }
+    }
+
+    var tintColor: NSColor {
+        switch self {
+        case .note: return .systemBlue
+        case .tip: return .systemGreen
+        case .important: return .systemPurple
+        case .warning: return .systemYellow
+        case .caution: return .systemRed
+        }
+    }
+}
+
 enum MarkdownBlock: Sendable {
     case frontMatter(String)
     case heading(level: Int, text: String)
     case paragraph(String)
     case quote([String])
+    case alert(kind: MarkdownAlertKind, title: String?, paragraphs: [String])
     case list([MarkdownListItem])
     case code(language: String?, text: String)
     case table(MarkdownTable)
@@ -63,6 +88,12 @@ public struct MarkdownPreparedDocument: Sendable {
 public final class MarkdownDocumentRenderer {
     private let settings: MarkdownRenderSettings
     private static let inlineMarkdownMarkerCharacters = CharacterSet(charactersIn: "[]()*_`~<>!\\")
+    private static let alertMarkerRegex: NSRegularExpression = {
+        // Matches [!KIND] optionally followed by a custom title on the same line.
+        // Anchored so the entire content of the first quote line must match this pattern.
+        let pattern = #"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s+(.+))?$"#
+        return try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+    }()
 
     public init(settings: MarkdownRenderSettings = .default) {
         self.settings = settings
@@ -261,6 +292,12 @@ public final class MarkdownDocumentRenderer {
                 continue
             }
 
+            if let alert = try parseAlertBlock(from: lines, startingAt: index) {
+                blocks.append(.alert(kind: alert.kind, title: alert.title, paragraphs: alert.paragraphs))
+                index = alert.nextIndex
+                continue
+            }
+
             if let quote = try parseQuoteBlock(from: lines, startingAt: index) {
                 blocks.append(.quote(quote.paragraphs))
                 index = quote.nextIndex
@@ -325,6 +362,57 @@ public final class MarkdownDocumentRenderer {
         }
 
         return (language, codeLines.joined(separator: "\n"), cursor)
+    }
+
+    /// Tries to parse a GitHub-style alert blockquote (`> [!KIND] optional title`).
+    /// Operates directly on raw lines to avoid the joined-paragraph bug.
+    private func parseAlertBlock(from lines: [String], startingAt index: Int) throws -> (kind: MarkdownAlertKind, title: String?, paragraphs: [String], nextIndex: Int)? {
+        guard isQuoteLine(lines[index]) else { return nil }
+
+        // Strip the `> ` prefix from the first line and run the alert regex.
+        let firstContent = quoteContent(from: lines[index])
+        let nsFirstContent = firstContent as NSString
+        let fullRange = NSRange(location: 0, length: nsFirstContent.length)
+        guard let match = Self.alertMarkerRegex.firstMatch(in: firstContent, options: [], range: fullRange) else {
+            return nil
+        }
+
+        // Capture group 1: the kind keyword.
+        let kindRange = match.range(at: 1)
+        guard kindRange.location != NSNotFound else { return nil }
+        let kindString = nsFirstContent.substring(with: kindRange).lowercased()
+        guard let kind = MarkdownAlertKind(rawValue: kindString) else { return nil }
+
+        // Capture group 2: optional custom title (may be absent).
+        let titleRange = match.range(at: 2)
+        let title: String? = titleRange.location != NSNotFound ? nsFirstContent.substring(with: titleRange) : nil
+
+        // Build body paragraphs from remaining consecutive quote lines.
+        var paragraphs: [String] = []
+        var currentParagraphLines: [String] = []
+        var cursor = index + 1
+
+        while cursor < lines.count, isQuoteLine(lines[cursor]) {
+            try throwIfCancelled()
+            let content = quoteContent(from: lines[cursor])
+
+            if content.isEmpty {
+                if currentParagraphLines.isEmpty == false {
+                    paragraphs.append(currentParagraphLines.joined(separator: " "))
+                    currentParagraphLines.removeAll()
+                }
+            } else {
+                currentParagraphLines.append(content)
+            }
+
+            cursor += 1
+        }
+
+        if currentParagraphLines.isEmpty == false {
+            paragraphs.append(currentParagraphLines.joined(separator: " "))
+        }
+
+        return (kind, title, paragraphs, cursor)
     }
 
     private func parseQuoteBlock(from lines: [String], startingAt index: Int) throws -> (paragraphs: [String], nextIndex: Int)? {
@@ -585,6 +673,9 @@ public final class MarkdownDocumentRenderer {
         case .quote(let paragraphs):
             let text = paragraphs.joined(separator: "\n\n")
             appendInlineMarkdown(text, baseURL: baseURL, baseAttributes: quoteAttributes(), to: output)
+
+        case .alert(let kind, let title, let paragraphs):
+            appendAlert(kind: kind, title: title, paragraphs: paragraphs, baseURL: baseURL, to: output)
 
         case .list(let items):
             appendListItems(items, depth: 0, baseURL: baseURL, to: output)
@@ -919,6 +1010,54 @@ public final class MarkdownDocumentRenderer {
                 output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false))
             }
         }
+    }
+
+    private func appendAlert(
+        kind: MarkdownAlertKind,
+        title: String?,
+        paragraphs: [String],
+        baseURL: URL,
+        to output: NSMutableAttributedString
+    ) {
+        let scale = settings.textSizeLevel.scaleFactor
+
+        let displayedTitle = title ?? kind.displayTitle
+        let headerString = NSMutableAttributedString(string: "● \(displayedTitle)\n", attributes: [
+            .font: settings.fontFamily.font(ofSize: 13 * scale, weight: .semibold),
+            .foregroundColor: kind.tintColor,
+            .paragraphStyle: alertHeaderParagraphStyle(tint: kind.tintColor)
+        ])
+
+        output.append(headerString)
+
+        let body = paragraphs.joined(separator: "\n\n")
+        let bodyAttrs: [NSAttributedString.Key: Any] = [
+            .font: settings.fontFamily.font(ofSize: 15 * scale, weight: .regular),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: alertBodyParagraphStyle(tint: kind.tintColor)
+        ]
+        appendInlineMarkdown(body, baseURL: baseURL, baseAttributes: bodyAttrs, to: output)
+    }
+
+    private func alertHeaderParagraphStyle(tint: NSColor) -> NSParagraphStyle {
+        let style = bodyParagraphStyle()
+        let block = TintedBorderTextBlock(tint: tint)
+        block.setContentWidth(100, type: .percentageValueType)
+        block.setWidth(12, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .minY)
+        style.textBlocks = [block]
+        return style
+    }
+
+    private func alertBodyParagraphStyle(tint: NSColor) -> NSParagraphStyle {
+        let style = bodyParagraphStyle()
+        let block = TintedBorderTextBlock(tint: tint)
+        block.setContentWidth(100, type: .percentageValueType)
+        block.setWidth(12, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(4, type: .absoluteValueType, for: .padding, edge: .minY)
+        block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .maxY)
+        style.textBlocks = [block]
+        return style
     }
 
     private func appendCodeBlock(_ code: String, language: String?, to output: NSMutableAttributedString) {
@@ -1306,6 +1445,8 @@ private extension MarkdownBlock {
             return "paragraph"
         case .quote:
             return "quote"
+        case .alert:
+            return "alert"
         case .list:
             return "list"
         case .code:
@@ -1332,6 +1473,26 @@ private final class QuoteBorderTextBlock: NSTextBlock {
         let barRect = NSRect(x: frameRect.minX, y: frameRect.minY, width: barWidth, height: frameRect.height)
         let path = NSBezierPath(roundedRect: barRect, xRadius: barWidth / 2, yRadius: barWidth / 2)
         path.fill()
+    }
+}
+
+private final class TintedBorderTextBlock: NSTextBlock {
+    let tint: NSColor
+    init(tint: NSColor) {
+        self.tint = tint
+        super.init()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    override func drawBackground(
+        withFrame frameRect: NSRect,
+        in controlView: NSView?,
+        characterRange charRange: NSRange,
+        layoutManager: NSLayoutManager
+    ) {
+        let bar = NSRect(x: frameRect.minX, y: frameRect.minY, width: 3, height: frameRect.height)
+        tint.withAlphaComponent(0.85).setFill()
+        bar.fill()
     }
 }
 

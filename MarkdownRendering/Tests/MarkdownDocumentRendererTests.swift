@@ -938,6 +938,72 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         return url
     }
 
+    func testRenderParsesNoteAlert() throws {
+        let payload = try renderDocument(
+            """
+            > [!NOTE]
+            > Heads up.
+            """
+        ).payload
+
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("Note"),
+            "expected alert title 'Note' in output"
+        )
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("Heads up."),
+            "expected body 'Heads up.' in output"
+        )
+    }
+
+    func testRenderParsesWarningAlertWithCustomTitle() throws {
+        let payload = try renderDocument(
+            """
+            > [!WARNING] Read this first
+            > Mind the gap.
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("Read this first"), "expected custom title")
+        XCTAssertTrue(s.contains("Mind the gap."))
+        XCTAssertFalse(s.contains("[!WARNING]"), "raw marker should be stripped")
+    }
+
+    func testRenderUnknownAlertMarkerFallsBackToQuote() throws {
+        let payload = try renderDocument(
+            """
+            > [!FOO]
+            > Body.
+            """
+        ).payload
+
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("[!FOO]"),
+            "unknown alert marker should render as literal quote text"
+        )
+    }
+
+    func testRenderWarningAlertHasBodyAfterTitleLine() throws {
+        let payload = try renderDocument(
+            """
+            > [!WARNING] Read this first
+            > Mind the gap.
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let s = rendered.string as NSString
+        let titleLoc = s.range(of: "Read this first").location
+        let bodyLoc = s.range(of: "Mind the gap.").location
+        XCTAssertNotEqual(titleLoc, NSNotFound)
+        XCTAssertNotEqual(bodyLoc, NSNotFound)
+        XCTAssertLessThan(titleLoc, bodyLoc, "title must precede body in rendered output")
+        // Ensure the body is not concatenated into the title; they should be on separate paragraphs.
+        let titleEnd = titleLoc + ("Read this first" as NSString).length
+        let between = s.substring(with: NSRange(location: titleEnd, length: bodyLoc - titleEnd))
+        XCTAssertTrue(between.contains("\n"), "title and body must be separated by a newline; got '\(between)'")
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }
