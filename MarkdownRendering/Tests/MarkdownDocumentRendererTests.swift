@@ -1004,6 +1004,57 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(between.contains("\n"), "title and body must be separated by a newline; got '\(between)'")
     }
 
+    func testRenderNoteAlertHeaderUsesTintAndTextBlock() throws {
+        let payload = try renderDocument(
+            """
+            > [!NOTE]
+            > Body.
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+        let headerRange = nsString.range(of: "Note")
+        XCTAssertNotEqual(headerRange.location, NSNotFound)
+
+        let color = rendered.attribute(.foregroundColor, at: headerRange.location, effectiveRange: nil) as? NSColor
+        XCTAssertEqual(color, NSColor.systemBlue, "note header should use systemBlue tint")
+
+        let style = rendered.attribute(.paragraphStyle, at: headerRange.location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertNotNil(style?.textBlocks.first, "header paragraph should carry a TintedBorderTextBlock")
+    }
+
+    func testRenderWarningAlertBodyCarriesTintedBlock() throws {
+        let payload = try renderDocument(
+            """
+            > [!WARNING] Watch out
+            > Body line.
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let bodyRange = (rendered.string as NSString).range(of: "Body line.")
+        XCTAssertNotEqual(bodyRange.location, NSNotFound)
+
+        let style = rendered.attribute(.paragraphStyle, at: bodyRange.location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertNotNil(style?.textBlocks.first, "body paragraph should carry a TintedBorderTextBlock")
+    }
+
+    func testRenderAlertWithNoBodyStillRenders() throws {
+        let payload = try renderDocument("> [!TIP]").payload
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("Tip"), "empty-body alert should still render its title")
+        XCTAssertFalse(s.contains("[!TIP]"), "marker should be stripped even with no body")
+    }
+
+    func testRenderAlertWithWhitespaceOnlyCustomTitleFallsBackToDefault() throws {
+        let source = "> [!CAUTION]   \n> Body."
+        let payload = try renderDocument(source).payload
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("Caution"), "should fall back to default title 'Caution'")
+        XCTAssertTrue(s.contains("Body."))
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

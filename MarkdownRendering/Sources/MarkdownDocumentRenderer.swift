@@ -385,7 +385,9 @@ public final class MarkdownDocumentRenderer {
 
         // Capture group 2: optional custom title (may be absent).
         let titleRange = match.range(at: 2)
-        let title: String? = titleRange.location != NSNotFound ? nsFirstContent.substring(with: titleRange) : nil
+        let rawTitle: String? = titleRange.location != NSNotFound ? nsFirstContent.substring(with: titleRange) : nil
+        let trimmed = rawTitle?.trimmingCharacters(in: .whitespaces)
+        let title: String? = (trimmed?.isEmpty ?? true) ? nil : trimmed
 
         // Build body paragraphs from remaining consecutive quote lines.
         var paragraphs: [String] = []
@@ -1040,22 +1042,24 @@ public final class MarkdownDocumentRenderer {
     }
 
     private func alertHeaderParagraphStyle(tint: NSColor) -> NSParagraphStyle {
+        let scale = settings.textSizeLevel.scaleFactor
         let style = bodyParagraphStyle()
         let block = TintedBorderTextBlock(tint: tint)
         block.setContentWidth(100, type: .percentageValueType)
-        block.setWidth(12, type: .absoluteValueType, for: .padding, edge: .minX)
-        block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .minY)
+        block.setWidth(12 * scale, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(8 * scale, type: .absoluteValueType, for: .padding, edge: .minY)
         style.textBlocks = [block]
         return style
     }
 
     private func alertBodyParagraphStyle(tint: NSColor) -> NSParagraphStyle {
+        let scale = settings.textSizeLevel.scaleFactor
         let style = bodyParagraphStyle()
         let block = TintedBorderTextBlock(tint: tint)
         block.setContentWidth(100, type: .percentageValueType)
-        block.setWidth(12, type: .absoluteValueType, for: .padding, edge: .minX)
-        block.setWidth(4, type: .absoluteValueType, for: .padding, edge: .minY)
-        block.setWidth(8, type: .absoluteValueType, for: .padding, edge: .maxY)
+        block.setWidth(12 * scale, type: .absoluteValueType, for: .padding, edge: .minX)
+        block.setWidth(4 * scale, type: .absoluteValueType, for: .padding, edge: .minY)
+        block.setWidth(8 * scale, type: .absoluteValueType, for: .padding, edge: .maxY)
         style.textBlocks = [block]
         return style
     }
