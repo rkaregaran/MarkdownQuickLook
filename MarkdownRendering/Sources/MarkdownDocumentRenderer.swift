@@ -291,19 +291,23 @@ public final class MarkdownDocumentRenderer {
         var blocks: [MarkdownBlock] = []
         var index = 0
 
-        // Parse YAML front matter before main loop.
-        if index < lines.count, lines[index].trimmingCharacters(in: .whitespaces) == "---" {
-            var fmLines: [String] = []
-            var cursor = index + 1
-            while cursor < lines.count {
-                let line = lines[cursor]
-                if line.trimmingCharacters(in: .whitespaces) == "---" {
-                    blocks.append(.frontMatter(fmLines.joined(separator: "\n")))
-                    index = cursor + 1
-                    break
+        // Parse YAML or TOML front matter before main loop.
+        if index < lines.count {
+            let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+            if trimmed == "---" || trimmed == "+++" {
+                let delimiter = trimmed
+                var fmLines: [String] = []
+                var cursor = index + 1
+                while cursor < lines.count {
+                    let line = lines[cursor]
+                    if line.trimmingCharacters(in: .whitespaces) == delimiter {
+                        blocks.append(.frontMatter(fmLines.joined(separator: "\n")))
+                        index = cursor + 1
+                        break
+                    }
+                    fmLines.append(line)
+                    cursor += 1
                 }
-                fmLines.append(line)
-                cursor += 1
             }
         }
 

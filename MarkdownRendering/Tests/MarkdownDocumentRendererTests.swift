@@ -1346,4 +1346,37 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(appleURL?.absoluteString, "https://apple.com")
         XCTAssertEqual(googleURL?.absoluteString, "https://google.com")
     }
+
+    func testRenderRecognizesTOMLFrontMatter() throws {
+        let payload = try renderDocument(
+            """
+            +++
+            title = "Hello"
+            +++
+
+            # Body
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains(#"title = "Hello""#), "TOML body rendered")
+        XCTAssertTrue(s.contains("Body"))
+        XCTAssertFalse(s.contains("+++"), "TOML fence should be hidden in output")
+    }
+
+    func testRenderYAMLFrontMatterStillRecognized() throws {
+        let payload = try renderDocument(
+            """
+            ---
+            title: Hello
+            ---
+
+            # Body
+            """
+        ).payload
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("title: Hello"))
+        XCTAssertTrue(s.contains("Body"))
+        XCTAssertFalse(s.contains("---"), "YAML fence should be hidden")
+    }
 }
