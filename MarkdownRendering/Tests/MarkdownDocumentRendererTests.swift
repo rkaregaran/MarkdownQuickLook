@@ -1055,6 +1055,48 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(s.contains("Body."))
     }
 
+    func testRenderInlineFootnoteReferenceIsSuperscript() throws {
+        let payload = try renderDocument(
+            """
+            Body text[^1].
+
+            [^1]: First note.
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("Body text"), "body present")
+        XCTAssertTrue(s.contains("¹") || s.contains("[1]"), "reference rendered as numeric marker")
+        XCTAssertTrue(s.contains("First note."), "footnote definition rendered in section")
+        XCTAssertFalse(s.contains("[^1]"), "raw markdown reference should be replaced")
+    }
+
+    func testRenderUndefinedFootnoteReferenceRendersLiteral() throws {
+        let payload = try renderDocument("Body[^missing].").payload
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("[^missing]"),
+            "undefined reference must render literally"
+        )
+    }
+
+    func testRenderRendersFootnoteSectionInDocumentOrder() throws {
+        let payload = try renderDocument(
+            """
+            First[^a] then second[^b].
+
+            [^b]: Beta.
+            [^a]: Alpha.
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        let alphaIdx = (s as NSString).range(of: "Alpha.").location
+        let betaIdx = (s as NSString).range(of: "Beta.").location
+        XCTAssertNotEqual(alphaIdx, NSNotFound)
+        XCTAssertNotEqual(betaIdx, NSNotFound)
+        XCTAssertLessThan(alphaIdx, betaIdx, "Alpha referenced first should render first in section")
+    }
+
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
         let url = try temporaryMarkdownFile(contents)
         defer { try? FileManager.default.removeItem(at: url) }

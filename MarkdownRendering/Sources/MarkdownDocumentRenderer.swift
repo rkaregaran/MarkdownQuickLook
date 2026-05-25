@@ -66,11 +66,18 @@ enum MarkdownBlock: Sendable {
     case table(MarkdownTable)
     case horizontalRule
     case image(alt: String, path: String)
+    case footnotesSection([MarkdownFootnoteDefinition])
 }
 
 struct MarkdownTable: Sendable {
     let headers: [String]
     let rows: [[String]]
+}
+
+struct MarkdownFootnoteDefinition: Sendable {
+    let id: String
+    let number: Int
+    let paragraphs: [String]
 }
 
 struct MarkdownListItem: Sendable {
@@ -94,6 +101,19 @@ public final class MarkdownDocumentRenderer {
         let pattern = #"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s+(.+))?$"#
         return try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
     }()
+
+    private static let footnoteDefinitionRegex: NSRegularExpression = {
+        try! NSRegularExpression(pattern: #"^\[\^([^\]]+)\]:\s*(.*)$"#)
+    }()
+
+    private static let footnoteReferenceRegex: NSRegularExpression = {
+        try! NSRegularExpression(pattern: #"\[\^([^\]]+)\]"#)
+    }()
+
+    private static let superscriptDigits: [Character: Character] = [
+        "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+        "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
+    ]
 
     public init(settings: MarkdownRenderSettings = .default) {
         self.settings = settings
@@ -246,7 +266,13 @@ public final class MarkdownDocumentRenderer {
 
     private func parseBlocks(in source: String) throws -> [MarkdownBlock] {
         let normalizedSource = normalizeLineEndings(in: source)
-        let lines = normalizedSource.components(separatedBy: .newlines)
+        let rawLines = normalizedSource.components(separatedBy: .newlines)
+
+        // Footnote pre-passes: extract definitions, resolve order, replace references.
+        let (cleanedLines, footnoteDefinitions) = extractFootnoteDefinitions(from: rawLines)
+        let resolved = resolveFootnoteOrder(cleanedLines: cleanedLines, definitions: footnoteDefinitions)
+        let lines = replaceFootnoteReferences(in: cleanedLines, numbersByID: resolved.numbersByID)
+
         var blocks: [MarkdownBlock] = []
         var index = 0
 
@@ -334,6 +360,10 @@ public final class MarkdownDocumentRenderer {
             let paragraph = try parseParagraph(from: lines, startingAt: index)
             blocks.append(.paragraph(paragraph.text))
             index = paragraph.nextIndex
+        }
+
+        if !resolved.ordered.isEmpty {
+            blocks.append(.footnotesSection(resolved.ordered))
         }
 
         return blocks
@@ -729,6 +759,9 @@ public final class MarkdownDocumentRenderer {
             ]
 
             output.append(NSAttributedString(string: text, attributes: attributes))
+
+        case .footnotesSection(let defs):
+            appendFootnotesSection(defs, baseURL: baseURL, to: output)
         }
     }
 
@@ -1436,6 +1469,148 @@ public final class MarkdownDocumentRenderer {
         return nil
     }
 
+    /// Strips `[^id]: text` lines (and their indented continuation lines) from the
+    /// document and returns (cleanedLines, definitionsByID).
+    private func extractFootnoteDefinitions(from lines: [String]) -> (cleaned: [String], definitions: [String: [String]]) {
+        var cleaned: [String] = []
+        var definitions: [String: [String]] = [:]
+        var index = 0
+
+        while index < lines.count {
+            let line = lines[index]
+            let nsLine = line as NSString
+            let range = NSRange(location: 0, length: nsLine.length)
+
+            if let match = Self.footnoteDefinitionRegex.firstMatch(in: line, options: .anchored, range: range) {
+                let id = nsLine.substring(with: match.range(at: 1))
+                var paragraphs: [String] = []
+                var currentLines: [String] = [nsLine.substring(with: match.range(at: 2))]
+
+                var cursor = index + 1
+                while cursor < lines.count {
+                    let nextRaw = lines[cursor]
+                    if nextRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if let peek = nextNonBlankLineIndex(in: lines, startingAt: cursor + 1),
+                           leadingSpaceCount(lines[peek]) >= 4,
+                           Self.footnoteDefinitionRegex.firstMatch(in: lines[peek], options: .anchored, range: NSRange(location: 0, length: (lines[peek] as NSString).length)) == nil {
+                            if !currentLines.isEmpty {
+                                paragraphs.append(currentLines.joined(separator: " "))
+                                currentLines.removeAll()
+                            }
+                            currentLines.append(lines[peek].trimmingCharacters(in: .whitespaces))
+                            cursor = peek + 1
+                            continue
+                        }
+                        break
+                    }
+                    if leadingSpaceCount(nextRaw) >= 4 {
+                        currentLines.append(nextRaw.trimmingCharacters(in: .whitespaces))
+                        cursor += 1
+                        continue
+                    }
+                    break
+                }
+
+                if !currentLines.isEmpty {
+                    paragraphs.append(currentLines.joined(separator: " "))
+                }
+
+                definitions[id] = paragraphs
+                index = cursor
+                continue
+            }
+
+            cleaned.append(line)
+            index += 1
+        }
+
+        return (cleaned, definitions)
+    }
+
+    private func resolveFootnoteOrder(
+        cleanedLines: [String],
+        definitions: [String: [String]]
+    ) -> (ordered: [MarkdownFootnoteDefinition], numbersByID: [String: Int]) {
+        var numbersByID: [String: Int] = [:]
+        var ordered: [MarkdownFootnoteDefinition] = []
+        var counter = 0
+
+        for line in cleanedLines {
+            let nsLine = line as NSString
+            let matches = Self.footnoteReferenceRegex.matches(
+                in: line,
+                range: NSRange(location: 0, length: nsLine.length)
+            )
+            for match in matches {
+                let id = nsLine.substring(with: match.range(at: 1))
+                guard definitions[id] != nil, numbersByID[id] == nil else { continue }
+                counter += 1
+                numbersByID[id] = counter
+                ordered.append(MarkdownFootnoteDefinition(
+                    id: id,
+                    number: counter,
+                    paragraphs: definitions[id] ?? []
+                ))
+            }
+        }
+        return (ordered, numbersByID)
+    }
+
+    private func replaceFootnoteReferences(
+        in lines: [String],
+        numbersByID: [String: Int]
+    ) -> [String] {
+        return lines.map { line -> String in
+            let nsLine = line as NSString
+            let matches = Self.footnoteReferenceRegex.matches(
+                in: line,
+                range: NSRange(location: 0, length: nsLine.length)
+            )
+            guard !matches.isEmpty else { return line }
+
+            var result = ""
+            var cursor = 0
+            for match in matches {
+                let id = nsLine.substring(with: match.range(at: 1))
+                result += nsLine.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                if let n = numbersByID[id] {
+                    result += String(String(n).compactMap { Self.superscriptDigits[$0] })
+                } else {
+                    result += nsLine.substring(with: match.range)
+                }
+                cursor = match.range.location + match.range.length
+            }
+            result += nsLine.substring(from: cursor)
+            return result
+        }
+    }
+
+    private func appendFootnotesSection(
+        _ defs: [MarkdownFootnoteDefinition],
+        baseURL: URL,
+        to output: NSMutableAttributedString
+    ) {
+        let scale = settings.textSizeLevel.scaleFactor
+
+        output.append(NSAttributedString(string: "\n", attributes: paragraphAttributes()))
+        let title = NSMutableAttributedString(string: "Footnotes", attributes: [
+            .font: settings.fontFamily.font(ofSize: 13 * scale, weight: .semibold),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: bodyParagraphStyle()
+        ])
+        output.append(title)
+        output.append(NSAttributedString(string: "\n", attributes: paragraphAttributes()))
+
+        for (i, def) in defs.enumerated() {
+            let body = def.paragraphs.joined(separator: "\n\n")
+            let prefix = "\(def.number). "
+            appendInlineMarkdown(prefix + body, baseURL: baseURL, baseAttributes: paragraphAttributes(), to: output)
+            if i < defs.count - 1 {
+                output.append(NSAttributedString(string: "\n\n", attributes: paragraphAttributes()))
+            }
+        }
+    }
+
 }
 
 private extension MarkdownBlock {
@@ -1461,6 +1636,8 @@ private extension MarkdownBlock {
             return "horizontalRule"
         case .image:
             return "image"
+        case .footnotesSection:
+            return "footnotesSection"
         }
     }
 }
