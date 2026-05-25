@@ -114,6 +114,14 @@ public final class MarkdownDocumentRenderer {
         try! NSRegularExpression(pattern: #"\[\^([^\]]+)\]"#)
     }()
 
+    private static let linkDefinitionRegex: NSRegularExpression = {
+        try! NSRegularExpression(pattern: #"^\s{0,3}\[([^\]]+)\]:\s+(\S+)(?:\s+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?\s*$"#)
+    }()
+
+    private static let referenceLinkRegex: NSRegularExpression = {
+        try! NSRegularExpression(pattern: #"\[([^\]]+)\]\[([^\]]*)\]"#)
+    }()
+
     private static let superscriptDigits: [Character: Character] = [
         "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
         "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
@@ -273,9 +281,11 @@ public final class MarkdownDocumentRenderer {
         let rawLines = normalizedSource.components(separatedBy: .newlines)
 
         // Footnote pre-passes: extract definitions, resolve order, replace references.
-        let (cleanedLines, footnoteDefinitions) = extractFootnoteDefinitions(from: rawLines)
-        let resolved = resolveFootnoteOrder(cleanedLines: cleanedLines, definitions: footnoteDefinitions)
-        let lines = replaceFootnoteReferences(in: cleanedLines, numbersByID: resolved.numbersByID)
+        let (footnoteCleanedLines, footnoteDefinitions) = extractFootnoteDefinitions(from: rawLines)
+        let resolved = resolveFootnoteOrder(cleanedLines: footnoteCleanedLines, definitions: footnoteDefinitions)
+        let (linkCleanedLines, linkDefinitions) = extractLinkDefinitions(from: footnoteCleanedLines)
+        let inlinedLines = resolveReferenceLinks(in: linkCleanedLines, definitions: linkDefinitions)
+        let lines = replaceFootnoteReferences(in: inlinedLines, numbersByID: resolved.numbersByID)
 
         var blocks: [MarkdownBlock] = []
         var index = 0
@@ -1649,6 +1659,46 @@ public final class MarkdownDocumentRenderer {
                 result += nsLine.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
                 if let n = numbersByID[id] {
                     result += String(String(n).compactMap { Self.superscriptDigits[$0] })
+                } else {
+                    result += nsLine.substring(with: match.range)
+                }
+                cursor = match.range.location + match.range.length
+            }
+            result += nsLine.substring(from: cursor)
+            return result
+        }
+    }
+
+    private func extractLinkDefinitions(from lines: [String]) -> (cleaned: [String], definitions: [String: String]) {
+        var cleaned: [String] = []
+        var definitions: [String: String] = [:]
+        for line in lines {
+            let nsLine = line as NSString
+            if let match = Self.linkDefinitionRegex.firstMatch(in: line, range: NSRange(location: 0, length: nsLine.length)) {
+                let label = nsLine.substring(with: match.range(at: 1)).lowercased()
+                let url = nsLine.substring(with: match.range(at: 2))
+                if definitions[label] == nil { definitions[label] = url }
+                continue
+            }
+            cleaned.append(line)
+        }
+        return (cleaned, definitions)
+    }
+
+    private func resolveReferenceLinks(in lines: [String], definitions: [String: String]) -> [String] {
+        return lines.map { line -> String in
+            let nsLine = line as NSString
+            let matches = Self.referenceLinkRegex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
+            guard !matches.isEmpty else { return line }
+            var result = ""
+            var cursor = 0
+            for match in matches {
+                let text = nsLine.substring(with: match.range(at: 1))
+                let rawLabel = nsLine.substring(with: match.range(at: 2))
+                let label = (rawLabel.isEmpty ? text : rawLabel).lowercased()
+                result += nsLine.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                if let url = definitions[label] {
+                    result += "[\(text)](\(url))"
                 } else {
                     result += nsLine.substring(with: match.range)
                 }

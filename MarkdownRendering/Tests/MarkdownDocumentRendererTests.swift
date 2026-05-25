@@ -1265,4 +1265,28 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         let font = rendered.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
         XCTAssertFalse(font?.isFixedPitch ?? false)
     }
+
+    func testRenderResolvesReferenceStyleLinks() throws {
+        let payload = try renderDocument(
+            """
+            See [Apple][site] for details.
+
+            [site]: https://apple.com "Apple Inc."
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let linkRange = (rendered.string as NSString).range(of: "Apple")
+        let link = rendered.attribute(.link, at: linkRange.location, effectiveRange: nil)
+
+        XCTAssertNotNil(link, "Apple should be a resolved link")
+        let url = (link as? URL) ?? URL(string: link as? String ?? "")
+        XCTAssertEqual(url?.absoluteString, "https://apple.com")
+        XCTAssertFalse(payload.attributedContent.string.contains("[site]:"), "definition line should be hidden")
+    }
+
+    func testRenderLeavesUnresolvedReferenceLiteral() throws {
+        let payload = try renderDocument("See [missing][nope].").payload
+        XCTAssertTrue(payload.attributedContent.string.contains("[missing][nope]"))
+    }
 }
