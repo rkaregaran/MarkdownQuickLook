@@ -1379,4 +1379,38 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertTrue(s.contains("Body"))
         XCTAssertFalse(s.contains("---"), "YAML fence should be hidden")
     }
+
+    func testRenderTreatsOnlyFirstWordAsCodeFenceLanguage() throws {
+        let payload = try renderDocument(
+            """
+            ```swift title="example.swift"
+            let x = 1
+            ```
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let codeRange = (rendered.string as NSString).range(of: "let x = 1")
+        XCTAssertNotEqual(codeRange.location, NSNotFound)
+
+        // Swift highlighting tints `let` system-pink — proves language was recognized as Swift.
+        let letRange = (rendered.string as NSString).range(of: "let")
+        let color = rendered.attribute(.foregroundColor, at: letRange.location, effectiveRange: nil) as? NSColor
+        XCTAssertEqual(color, NSColor.systemPink, "swift keyword should be highlighted — proving language=swift")
+    }
+
+    func testRenderTreatsMermaidWithAttributesAsMermaid() throws {
+        let payload = try renderDocument(
+            """
+            ```mermaid {theme=dark}
+            graph TD; A-->B;
+            ```
+            """
+        ).payload
+
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("Mermaid Diagram"),
+            "the 📊 Mermaid Diagram label should fire — proving language=mermaid"
+        )
+    }
 }

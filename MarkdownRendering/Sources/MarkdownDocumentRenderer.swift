@@ -400,8 +400,12 @@ public final class MarkdownDocumentRenderer {
         }
 
         let fenceTrimmed = lines[index].trimmingCharacters(in: .whitespaces)
-        let langHint = String(fenceTrimmed.drop { $0 == "`" }.trimmingCharacters(in: .whitespaces))
-        let language = langHint.isEmpty ? nil : langHint.lowercased()
+        let infoString = String(fenceTrimmed.drop { $0 == "`" }.trimmingCharacters(in: .whitespaces))
+        let language: String? = {
+            guard !infoString.isEmpty else { return nil }
+            let firstToken = infoString.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? ""
+            return firstToken.isEmpty ? nil : firstToken.lowercased()
+        }()
 
         var codeLines: [String] = []
         var cursor = index + 1
