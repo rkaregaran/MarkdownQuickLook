@@ -26,6 +26,8 @@ public struct MarkdownRenderSettings: Codable, Equatable, Sendable {
         case textSizeLevel, fontFamily, smartDashes
     }
 
+    // Legacy migration: textSizeLevel/fontFamily existed in v1 JSON (required);
+    // smartDashes was added later (decodeIfPresent, defaults to true).
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.textSizeLevel = try container.decode(TextSizeLevel.self, forKey: .textSizeLevel)

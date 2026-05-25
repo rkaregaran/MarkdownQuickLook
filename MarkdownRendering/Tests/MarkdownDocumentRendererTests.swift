@@ -599,9 +599,8 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         let payload = try renderer.render(fileAt: url)
         XCTAssertTrue(
-            payload.attributedContent.string.contains("\u{2014}") ||
-            payload.attributedContent.string.contains("\u{2013}"),
-            "em-dash or en-dash substitution should fire by default"
+            payload.attributedContent.string.contains("\u{2014}"),
+            "em-dash substitution should fire by default for triple-hyphen"
         )
     }
 

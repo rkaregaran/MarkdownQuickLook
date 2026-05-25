@@ -45,6 +45,14 @@ final class MarkdownRenderSettingsTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
+    func testSettingsRoundTripSmartDashesFalse() throws {
+        let original = MarkdownRenderSettings(textSizeLevel: .medium, fontFamily: .system, smartDashes: false)
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(MarkdownRenderSettings.self, from: encoded)
+        XCTAssertEqual(decoded, original)
+        XCTAssertFalse(decoded.smartDashes, "explicit false must survive encode/decode")
+    }
+
     func testFontFamilySystemReturnsSystemFont() {
         let font = FontFamily.system.font(ofSize: 15, weight: .regular)
         XCTAssertEqual(font.pointSize, 15)
