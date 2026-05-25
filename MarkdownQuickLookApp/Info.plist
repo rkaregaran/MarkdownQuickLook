@@ -38,6 +38,9 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>net.daringfireball.markdown</string>
+				<string>public.markdown</string>
+				<string>net.ia.markdown</string>
+				<string>com.unknown.md</string>
 			</array>
 		</dict>
 	</array>
