@@ -1209,4 +1209,44 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         return count
     }
+
+    func testRenderIndentedCodeBlock() throws {
+        let payload = try renderDocument(
+            """
+            Intro text.
+
+                let x = 1
+                let y = 2
+
+            Outro text.
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("let x = 1"), "code line one")
+        XCTAssertTrue(s.contains("let y = 2"), "code line two")
+        XCTAssertTrue(s.contains("Intro text."))
+        XCTAssertTrue(s.contains("Outro text."))
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let codeRange = (rendered.string as NSString).range(of: "let x = 1")
+        let font = rendered.attribute(.font, at: codeRange.location, effectiveRange: nil) as? NSFont
+        XCTAssertTrue(font?.isFixedPitch ?? false, "indented block must use monospaced font")
+    }
+
+    func testRenderDoesNotTreatListContinuationAsIndentedCode() throws {
+        let payload = try renderDocument(
+            """
+            - first
+
+              second paragraph in same item
+            """
+        ).payload
+        let s = payload.attributedContent.string
+        XCTAssertTrue(s.contains("second paragraph in same item"))
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let range = (rendered.string as NSString).range(of: "second paragraph")
+        let font = rendered.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+        XCTAssertFalse(font?.isFixedPitch ?? false)
+    }
 }

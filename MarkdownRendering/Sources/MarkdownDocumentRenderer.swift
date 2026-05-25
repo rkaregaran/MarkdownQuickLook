@@ -310,6 +310,12 @@ public final class MarkdownDocumentRenderer {
                 continue
             }
 
+            if let indented = try parseIndentedCodeBlock(from: lines, startingAt: index) {
+                blocks.append(.code(language: nil, text: indented.text))
+                index = indented.nextIndex
+                continue
+            }
+
             if let heading = heading(from: lines[index]) {
                 blocks.append(.heading(level: heading.level, text: heading.text))
                 index += 1
@@ -396,6 +402,47 @@ public final class MarkdownDocumentRenderer {
         }
 
         return (language, codeLines.joined(separator: "\n"), cursor)
+    }
+
+    private func parseIndentedCodeBlock(from lines: [String], startingAt index: Int) throws -> (text: String, nextIndex: Int)? {
+        let line = lines[index]
+        guard isIndentedCodeLine(line) else { return nil }
+
+        var codeLines: [String] = [stripIndentForCode(line)]
+        var cursor = index + 1
+        var blankBuffer: [String] = []
+
+        while cursor < lines.count {
+            try throwIfCancelled()
+            let candidate = lines[cursor]
+            if candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                blankBuffer.append("")
+                cursor += 1
+                continue
+            }
+            if isIndentedCodeLine(candidate) {
+                codeLines.append(contentsOf: blankBuffer)
+                blankBuffer.removeAll()
+                codeLines.append(stripIndentForCode(candidate))
+                cursor += 1
+                continue
+            }
+            break
+        }
+
+        return (codeLines.joined(separator: "\n"), cursor)
+    }
+
+    private func isIndentedCodeLine(_ line: String) -> Bool {
+        if line.hasPrefix("\t") { return true }
+        if line.hasPrefix("    ") { return true }
+        return false
+    }
+
+    private func stripIndentForCode(_ line: String) -> String {
+        if line.hasPrefix("\t") { return String(line.dropFirst()) }
+        if line.hasPrefix("    ") { return String(line.dropFirst(4)) }
+        return line
     }
 
     /// Tries to parse a GitHub-style alert blockquote (`> [!KIND] optional title`).
