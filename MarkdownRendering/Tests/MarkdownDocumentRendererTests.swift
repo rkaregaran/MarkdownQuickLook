@@ -1249,4 +1249,20 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         let font = rendered.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
         XCTAssertFalse(font?.isFixedPitch ?? false)
     }
+
+    func testRenderDoesNotTreatFourSpaceListContinuationAsIndentedCode() throws {
+        // CommonMark: a 4-space-indented paragraph after a blank line inside a
+        // list item is a list continuation, not an indented code block.
+        let payload = try renderDocument(
+            """
+            - first
+
+                still the same item
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let range = (rendered.string as NSString).range(of: "still the same item")
+        let font = rendered.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
+        XCTAssertFalse(font?.isFixedPitch ?? false)
+    }
 }
