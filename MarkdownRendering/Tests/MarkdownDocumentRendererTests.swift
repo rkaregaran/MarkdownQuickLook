@@ -1289,4 +1289,61 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         let payload = try renderDocument("See [missing][nope].").payload
         XCTAssertTrue(payload.attributedContent.string.contains("[missing][nope]"))
     }
+
+    func testRenderResolvesCollapsedReferenceLink() throws {
+        let payload = try renderDocument(
+            """
+            See [Apple][] for details.
+
+            [apple]: https://apple.com
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let linkRange = (rendered.string as NSString).range(of: "Apple")
+        let link = rendered.attribute(.link, at: linkRange.location, effectiveRange: nil)
+        XCTAssertNotNil(link, "collapsed [Apple][] should resolve via text-as-label fallback")
+        let url = (link as? URL) ?? URL(string: link as? String ?? "")
+        XCTAssertEqual(url?.absoluteString, "https://apple.com")
+    }
+
+    func testRenderResolvesReferenceLinkCaseInsensitively() throws {
+        let payload = try renderDocument(
+            """
+            See [Apple][SITE] for details.
+
+            [site]: https://apple.com
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let linkRange = (rendered.string as NSString).range(of: "Apple")
+        let link = rendered.attribute(.link, at: linkRange.location, effectiveRange: nil)
+        XCTAssertNotNil(link, "mixed-case label should match lowercase definition")
+    }
+
+    func testRenderResolvesMultipleReferenceLinksOnSameLine() throws {
+        let payload = try renderDocument(
+            """
+            See [Apple][a] and [Google][g] together.
+
+            [a]: https://apple.com
+            [g]: https://google.com
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+        let appleRange = nsString.range(of: "Apple")
+        let googleRange = nsString.range(of: "Google")
+
+        let appleLink = rendered.attribute(.link, at: appleRange.location, effectiveRange: nil)
+        let googleLink = rendered.attribute(.link, at: googleRange.location, effectiveRange: nil)
+
+        let appleURL = (appleLink as? URL) ?? URL(string: appleLink as? String ?? "")
+        let googleURL = (googleLink as? URL) ?? URL(string: googleLink as? String ?? "")
+
+        XCTAssertEqual(appleURL?.absoluteString, "https://apple.com")
+        XCTAssertEqual(googleURL?.absoluteString, "https://google.com")
+    }
 }

@@ -280,7 +280,8 @@ public final class MarkdownDocumentRenderer {
         let normalizedSource = normalizeLineEndings(in: source)
         let rawLines = normalizedSource.components(separatedBy: .newlines)
 
-        // Footnote pre-passes: extract definitions, resolve order, replace references.
+        // Pre-passes: extract footnote and link definitions, resolve footnote order,
+        // inline reference-style links, then replace footnote references with superscripts.
         let (footnoteCleanedLines, footnoteDefinitions) = extractFootnoteDefinitions(from: rawLines)
         let resolved = resolveFootnoteOrder(cleanedLines: footnoteCleanedLines, definitions: footnoteDefinitions)
         let (linkCleanedLines, linkDefinitions) = extractLinkDefinitions(from: footnoteCleanedLines)
