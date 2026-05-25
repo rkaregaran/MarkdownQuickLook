@@ -1168,6 +1168,18 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(leftStyle?.alignment, .left)
         XCTAssertEqual(centerStyle?.alignment, .center)
         XCTAssertEqual(rightStyle?.alignment, .right)
+
+        let leftHeaderRange = nsString.range(of: "Left")
+        let centerHeaderRange = nsString.range(of: "Center")
+        let rightHeaderRange = nsString.range(of: "Right")
+
+        let leftHeaderStyle = rendered.attribute(.paragraphStyle, at: leftHeaderRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let centerHeaderStyle = rendered.attribute(.paragraphStyle, at: centerHeaderRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let rightHeaderStyle = rendered.attribute(.paragraphStyle, at: rightHeaderRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        XCTAssertEqual(leftHeaderStyle?.alignment, .left, "header should share column alignment")
+        XCTAssertEqual(centerHeaderStyle?.alignment, .center, "header should share column alignment")
+        XCTAssertEqual(rightHeaderStyle?.alignment, .right, "header should share column alignment")
     }
 
     func testRenderTableWithoutAlignmentMarkersStaysNatural() throws {

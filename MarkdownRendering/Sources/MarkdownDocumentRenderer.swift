@@ -1062,16 +1062,14 @@ public final class MarkdownDocumentRenderer {
 
         // Header row.
         for (col, header) in table.headers.enumerated() {
-            let alignment = col < table.alignments.count ? table.alignments[col] : .natural
-            output.append(cellString(header, row: 0, col: col, isHeader: true, alignment: alignment))
+            output.append(cellString(header, row: 0, col: col, isHeader: true, alignment: table.alignments[col]))
         }
 
         // Data rows.
         for (rowIndex, row) in table.rows.enumerated() {
             for col in 0..<columnCount {
                 let text = col < row.count ? row[col] : ""
-                let alignment = col < table.alignments.count ? table.alignments[col] : .natural
-                output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false, alignment: alignment))
+                output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false, alignment: table.alignments[col]))
             }
         }
     }
