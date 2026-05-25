@@ -1585,6 +1585,8 @@ public final class MarkdownDocumentRenderer {
         }
     }
 
+    // Note: footnote references inside a definition body render literally;
+    // nested footnote-in-footnote substitution is intentionally unsupported.
     private func appendFootnotesSection(
         _ defs: [MarkdownFootnoteDefinition],
         baseURL: URL,
@@ -1592,7 +1594,7 @@ public final class MarkdownDocumentRenderer {
     ) {
         let scale = settings.textSizeLevel.scaleFactor
 
-        output.append(NSAttributedString(string: "\n", attributes: paragraphAttributes()))
+        // No leading "\n" here — the render loop already inserts "\n\n" between consecutive blocks.
         let title = NSMutableAttributedString(string: "Footnotes", attributes: [
             .font: settings.fontFamily.font(ofSize: 13 * scale, weight: .semibold),
             .foregroundColor: NSColor.secondaryLabelColor,

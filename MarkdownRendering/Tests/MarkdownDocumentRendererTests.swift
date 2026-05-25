@@ -1066,7 +1066,7 @@ final class MarkdownDocumentRendererTests: XCTestCase {
 
         let s = payload.attributedContent.string
         XCTAssertTrue(s.contains("Body text"), "body present")
-        XCTAssertTrue(s.contains("¹") || s.contains("[1]"), "reference rendered as numeric marker")
+        XCTAssertTrue(s.contains("¹"), "reference rendered as superscript numeric marker")
         XCTAssertTrue(s.contains("First note."), "footnote definition rendered in section")
         XCTAssertFalse(s.contains("[^1]"), "raw markdown reference should be replaced")
     }
@@ -1095,6 +1095,29 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertNotEqual(alphaIdx, NSNotFound)
         XCTAssertNotEqual(betaIdx, NSNotFound)
         XCTAssertLessThan(alphaIdx, betaIdx, "Alpha referenced first should render first in section")
+    }
+
+    func testRenderFootnoteReferencesInsideDefinitionBodyRenderLiteral() throws {
+        let payload = try renderDocument(
+            """
+            Body[^1].
+
+            [^1]: See also [^other] for context.
+            [^other]: Other note.
+            """
+        ).payload
+
+        let s = payload.attributedContent.string
+        // Body reference is superscripted.
+        XCTAssertTrue(s.contains("¹"), "body reference should be superscripted")
+        // Reference inside the definition body remains literal — not substituted.
+        // replaceFootnoteReferences only runs over cleanedLines (definitions stripped),
+        // so [^other] inside the definition body text is never seen by that pass.
+        XCTAssertTrue(s.contains("[^other]"), "ref inside definition body should NOT be superscripted")
+        // [^other] is referenced only inside another definition's body. resolveFootnoteOrder
+        // scans cleanedLines (definitions removed), so [^other] is never encountered there —
+        // it gets no number and does NOT appear as a numbered section entry.
+        XCTAssertFalse(s.contains("Other note."), "ref-less definition body should not render as a section entry")
     }
 
     private func renderDocument(_ contents: String, settings: MarkdownRenderSettings = .default) throws -> (url: URL, payload: MarkdownRenderPayload) {
