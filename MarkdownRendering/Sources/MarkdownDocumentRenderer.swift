@@ -70,7 +70,11 @@ enum MarkdownBlock: Sendable {
 }
 
 struct MarkdownTable: Sendable {
+    enum ColumnAlignment: Sendable {
+        case natural, left, center, right
+    }
     let headers: [String]
+    let alignments: [ColumnAlignment]
     let rows: [[String]]
 }
 
@@ -615,6 +619,9 @@ public final class MarkdownDocumentRenderer {
         guard index + 1 < lines.count, isTableSeparatorLine(lines[index + 1]) else { return nil }
 
         let headers = tableCells(from: lines[index])
+        var alignments = tableColumnAlignments(from: lines[index + 1])
+        while alignments.count < headers.count { alignments.append(.natural) }
+        if alignments.count > headers.count { alignments = Array(alignments.prefix(headers.count)) }
         var cursor = index + 2
         var rows: [[String]] = []
 
@@ -628,7 +635,7 @@ public final class MarkdownDocumentRenderer {
             cursor += 1
         }
 
-        return (MarkdownTable(headers: headers, rows: rows), cursor)
+        return (MarkdownTable(headers: headers, alignments: alignments, rows: rows), cursor)
     }
 
     private func checkboxBullet(for text: String) -> (bullet: String, text: String) {
@@ -656,6 +663,20 @@ public final class MarkdownDocumentRenderer {
             .replacingOccurrences(of: ":", with: "")
             .trimmingCharacters(in: .whitespaces)
         return stripped.isEmpty
+    }
+
+    private func tableColumnAlignments(from separatorLine: String) -> [MarkdownTable.ColumnAlignment] {
+        return tableCells(from: separatorLine).map { cell -> MarkdownTable.ColumnAlignment in
+            let trimmed = cell.trimmingCharacters(in: .whitespaces)
+            let startsWithColon = trimmed.hasPrefix(":")
+            let endsWithColon = trimmed.hasSuffix(":")
+            switch (startsWithColon, endsWithColon) {
+            case (true, true): return .center
+            case (true, false): return .left
+            case (false, true): return .right
+            case (false, false): return .natural
+            }
+        }
     }
 
     private func tableCells(from line: String) -> [String] {
@@ -1019,10 +1040,16 @@ public final class MarkdownDocumentRenderer {
             return block
         }
 
-        func cellString(_ text: String, row: Int, col: Int, isHeader: Bool) -> NSAttributedString {
+        func cellString(_ text: String, row: Int, col: Int, isHeader: Bool, alignment: MarkdownTable.ColumnAlignment) -> NSAttributedString {
             let block = cellBlock(row: row, col: col, isHeader: isHeader)
             let style = NSMutableParagraphStyle()
             style.textBlocks = [block]
+            switch alignment {
+            case .left: style.alignment = .left
+            case .center: style.alignment = .center
+            case .right: style.alignment = .right
+            case .natural: style.alignment = .natural
+            }
 
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: isHeader ? boldFont : font,
@@ -1035,14 +1062,16 @@ public final class MarkdownDocumentRenderer {
 
         // Header row.
         for (col, header) in table.headers.enumerated() {
-            output.append(cellString(header, row: 0, col: col, isHeader: true))
+            let alignment = col < table.alignments.count ? table.alignments[col] : .natural
+            output.append(cellString(header, row: 0, col: col, isHeader: true, alignment: alignment))
         }
 
         // Data rows.
         for (rowIndex, row) in table.rows.enumerated() {
             for col in 0..<columnCount {
                 let text = col < row.count ? row[col] : ""
-                output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false))
+                let alignment = col < table.alignments.count ? table.alignments[col] : .natural
+                output.append(cellString(text, row: rowIndex + 1, col: col, isHeader: false, alignment: alignment))
             }
         }
     }

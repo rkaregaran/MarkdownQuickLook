@@ -1145,6 +1145,44 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         return textView.textStorage ?? NSTextStorage(attributedString: attributedContent)
     }
 
+    func testRenderTableRespectsColumnAlignment() throws {
+        let payload = try renderDocument(
+            """
+            | Left | Center | Right |
+            | :--- | :----: | ----: |
+            | a    | b      | c     |
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let nsString = rendered.string as NSString
+
+        let leftRange = nsString.range(of: "a")
+        let centerRange = nsString.range(of: "b")
+        let rightRange = nsString.range(of: "c")
+
+        let leftStyle = rendered.attribute(.paragraphStyle, at: leftRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let centerStyle = rendered.attribute(.paragraphStyle, at: centerRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let rightStyle = rendered.attribute(.paragraphStyle, at: rightRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        XCTAssertEqual(leftStyle?.alignment, .left)
+        XCTAssertEqual(centerStyle?.alignment, .center)
+        XCTAssertEqual(rightStyle?.alignment, .right)
+    }
+
+    func testRenderTableWithoutAlignmentMarkersStaysNatural() throws {
+        let payload = try renderDocument(
+            """
+            | A | B |
+            | --- | --- |
+            | 1 | 2 |
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let style = rendered.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(style?.alignment, .natural)
+    }
+
     private func lineFragmentCount(in textStorage: NSTextStorage, for characterRange: NSRange) -> Int {
         guard let layoutManager = textStorage.layoutManagers.first else {
             return 0
