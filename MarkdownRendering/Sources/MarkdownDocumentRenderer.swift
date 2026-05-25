@@ -896,7 +896,7 @@ public final class MarkdownDocumentRenderer {
         defer { MarkdownPerformanceInstrumentation.end(interval) }
 
         let shouldParseInlineMarkdown = requiresInlineMarkdownParsing(text)
-        let shouldReplaceDashes = containsDashReplacementCandidate(text)
+        let shouldReplaceDashes = settings.smartDashes && containsDashReplacementCandidate(text)
         let shouldApplyStrikethrough = containsStrikethroughCandidate(text)
         let shouldApplyInlineCode = containsInlineCodeCandidate(text)
 

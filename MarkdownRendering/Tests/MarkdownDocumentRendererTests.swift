@@ -579,6 +579,32 @@ final class MarkdownDocumentRendererTests: XCTestCase {
         XCTAssertEqual(payload.attributedContent.string, "Use --flag before — launch")
     }
 
+    func testRenderDisablesSmartDashesWhenSettingOff() throws {
+        let settings = MarkdownRenderSettings(smartDashes: false)
+        let renderer = MarkdownDocumentRenderer(settings: settings)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("dashes-\(UUID().uuidString).md")
+        try "Hello---world.".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let payload = try renderer.render(fileAt: url)
+        XCTAssertTrue(payload.attributedContent.string.contains("---"), "literal triple-dash retained when smart dashes disabled")
+        XCTAssertFalse(payload.attributedContent.string.contains("\u{2014}"))
+    }
+
+    func testRenderEnablesSmartDashesByDefault() throws {
+        let renderer = MarkdownDocumentRenderer(settings: .default)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("dashes-\(UUID().uuidString).md")
+        try "Hello---world.".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let payload = try renderer.render(fileAt: url)
+        XCTAssertTrue(
+            payload.attributedContent.string.contains("\u{2014}") ||
+            payload.attributedContent.string.contains("\u{2013}"),
+            "em-dash or en-dash substitution should fire by default"
+        )
+    }
+
     func testRenderInlineMarkdownFeatureMixAfterFastPath() throws {
         let payload = try renderDocument("Read [docs](https://example.com), **bold**, *italic*, `code`, and ~~old~~ text.").payload
         let rendered = renderedTextStorage(from: payload.attributedContent)

@@ -108,4 +108,15 @@ final class MarkdownSettingsStoreTests: XCTestCase {
         let store = MarkdownSettingsStore(defaults: defaults)
         XCTAssertEqual(store.settings, .default)
     }
+
+    func testStoreLoadsLegacySettingsWithoutSmartDashesAsTrue() throws {
+        // Simulate JSON written before the smartDashes field existed.
+        let legacyJSON = """
+        {"textSizeLevel": 2, "fontFamily": "system"}
+        """.data(using: .utf8)!
+        let defaults = makeDefaults()
+        defaults.set(legacyJSON, forKey: MarkdownSettingsStore.settingsKey)
+        let store = MarkdownSettingsStore(defaults: defaults)
+        XCTAssertTrue(store.settings.smartDashes, "legacy JSON without smartDashes must default to true")
+    }
 }

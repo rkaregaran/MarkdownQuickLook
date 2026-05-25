@@ -3,15 +3,34 @@ import AppKit
 public struct MarkdownRenderSettings: Codable, Equatable, Sendable {
     public var textSizeLevel: TextSizeLevel
     public var fontFamily: FontFamily
+    public var smartDashes: Bool
 
     public static let `default` = MarkdownRenderSettings(
         textSizeLevel: .medium,
-        fontFamily: .system
+        fontFamily: .system,
+        smartDashes: true
     )
 
-    public init(textSizeLevel: TextSizeLevel = .medium, fontFamily: FontFamily = .system) {
+    public init(
+        textSizeLevel: TextSizeLevel = .medium,
+        fontFamily: FontFamily = .system,
+        smartDashes: Bool = true
+    ) {
         self.textSizeLevel = textSizeLevel
         self.fontFamily = fontFamily
+        self.smartDashes = smartDashes
+    }
+
+    // Backwards-compatible decoding: old JSON blobs without smartDashes default to true.
+    private enum CodingKeys: String, CodingKey {
+        case textSizeLevel, fontFamily, smartDashes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.textSizeLevel = try container.decode(TextSizeLevel.self, forKey: .textSizeLevel)
+        self.fontFamily = try container.decode(FontFamily.self, forKey: .fontFamily)
+        self.smartDashes = try container.decodeIfPresent(Bool.self, forKey: .smartDashes) ?? true
     }
 }
 
