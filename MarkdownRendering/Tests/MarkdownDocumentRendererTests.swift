@@ -1438,4 +1438,36 @@ final class MarkdownDocumentRendererTests: XCTestCase {
             "the 📊 Mermaid Diagram label should fire — proving language=mermaid"
         )
     }
+
+    func testRenderAppliesRightToLeftDirectionForArabicParagraph() throws {
+        let payload = try renderDocument(
+            """
+            مرحبا بالعالم. هذه فقرة باللغة العربية.
+
+            English paragraph after.
+            """
+        ).payload
+
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let arabicRange = (rendered.string as NSString).range(of: "مرحبا")
+        let englishRange = (rendered.string as NSString).range(of: "English")
+
+        let arabicStyle = rendered.attribute(.paragraphStyle, at: arabicRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let englishStyle = rendered.attribute(.paragraphStyle, at: englishRange.location, effectiveRange: nil) as? NSParagraphStyle
+
+        XCTAssertEqual(arabicStyle?.baseWritingDirection, .rightToLeft)
+        XCTAssertNotEqual(englishStyle?.baseWritingDirection, .rightToLeft)
+    }
+
+    func testRenderAppliesRightToLeftDirectionForHebrewParagraph() throws {
+        let payload = try renderDocument(
+            """
+            שלום עולם. זוהי פסקה בעברית.
+            """
+        ).payload
+        let rendered = renderedTextStorage(from: payload.attributedContent)
+        let hebrewRange = (rendered.string as NSString).range(of: "שלום")
+        let style = rendered.attribute(.paragraphStyle, at: hebrewRange.location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(style?.baseWritingDirection, .rightToLeft)
+    }
 }

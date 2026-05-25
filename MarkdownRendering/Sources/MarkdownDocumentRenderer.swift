@@ -918,6 +918,7 @@ public final class MarkdownDocumentRenderer {
                 applyInlineCodeBackground(to: attributed, from: parsed)
             }
 
+            applyRTLIfNeeded(text: text, to: attributed)
             return attributed
         }
 
@@ -927,7 +928,44 @@ public final class MarkdownDocumentRenderer {
             applyDashes(to: attributed, skippingCodeRanges: IndexSet())
         }
 
+        applyRTLIfNeeded(text: text, to: attributed)
         return attributed
+    }
+
+    private func paragraphIsRTL(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            // First-strong character wins. Common RTL Unicode blocks:
+            // Hebrew (0590-05FF), Arabic (0600-06FF), Arabic Supplement (0750-077F),
+            // Arabic Presentation Forms A (FB50-FDFF), Forms B (FE70-FEFF).
+            if (0x0590...0x05FF).contains(v) ||
+               (0x0600...0x06FF).contains(v) ||
+               (0x0750...0x077F).contains(v) ||
+               (0xFB50...0xFDFF).contains(v) ||
+               (0xFE70...0xFEFF).contains(v) {
+                return true
+            }
+            // First strong LTR letter wins. Cover Latin (A-Z, a-z plus extended),
+            // Greek/Cyrillic-ish (0080-024F), and CJK (4E00-9FFF).
+            if (0x0041...0x005A).contains(v) ||
+               (0x0061...0x007A).contains(v) ||
+               (0x00C0...0x024F).contains(v) ||
+               (0x4E00...0x9FFF).contains(v) {
+                return false
+            }
+        }
+        return false
+    }
+
+    private func applyRTLIfNeeded(text: String, to attributed: NSMutableAttributedString) {
+        guard paragraphIsRTL(text) else { return }
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        attributed.enumerateAttribute(.paragraphStyle, in: fullRange, options: []) { value, range, _ in
+            let base = (value as? NSParagraphStyle) ?? bodyParagraphStyle()
+            let mutable = base.mutableCopy() as! NSMutableParagraphStyle
+            mutable.baseWritingDirection = .rightToLeft
+            attributed.addAttribute(.paragraphStyle, value: mutable as NSParagraphStyle, range: range)
+        }
     }
 
     private func requiresInlineMarkdownParsing(_ text: String) -> Bool {
